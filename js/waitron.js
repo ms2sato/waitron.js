@@ -11,11 +11,15 @@
 })(typeof window !== 'undefined' ? window : this, function (global, undefined) { // eslint-disable-line
   'use strict'
 
+  /*global $ _ */
+
   // @see http://stackoverflow.com/questions/8403108/calling-eval-in-particular-context
   function evalInContext (js, context) {
     /* eslint-disable no-eval */
     return function () {
+      /* eslint-disable no-unused-vars */
       var self = context
+      /* eslint-enable no-unused-vars */
       return eval(js)
     }.call(context)
     /* eslint-enable no-eval */
@@ -58,7 +62,7 @@
     return ret
   }
 
-  var scriptsSelector = 'script[type=waitron]'
+  var scriptsSelector = 'script[type="text/waitron"]'
   var scriptRegex = /<initialize>([\s\S]*)<\/initialize>/
   var templateRegex = /<template>([\s\S]*)<\/template>/
   function extractRegex (regex, text) {
@@ -67,8 +71,8 @@
   }
 
   var ComponentType = (function () {
-
     function Component (componentType) { this.componentType = componentType }
+
     Component.prototype.init = function (el) {
       el = el || document.createElement('div')
 
