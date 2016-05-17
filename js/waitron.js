@@ -14,10 +14,10 @@
   // @see http://stackoverflow.com/questions/8403108/calling-eval-in-particular-context
   function evalInContext (js, context) {
     /* eslint-disable no-eval */
-    return function () { 
+    return function () {
       var self = context
       return eval(js)
-     }.call(context)
+    }.call(context)
     /* eslint-enable no-eval */
   }
 
@@ -66,34 +66,61 @@
     return m[1]
   }
 
-  function Component () {}
-  Component.prototype.init = function (parent, scripts, templates) {
-    var el = document.createElement('div')
-    var w = me(el)
-    $(parent).after(el)
-    evalInContext(scripts, w)
+  var ComponentType = (function () {
 
-    this.w = w
-    w.template = _.template(templates)
-    w.update()
-  }
+    function Component (componentType) { this.componentType = componentType }
+    Component.prototype.init = function (el) {
+      el = el || document.createElement('div')
 
-  Component.create = function (parent, shadows) {
-    var c = new Component()
-    var scripts = extractRegex(scriptRegex, shadows)
-    var templates = extractRegex(templateRegex, shadows)
-    c.init(parent, scripts, templates)
-    return c
-  }
+      var scripts = this.componentType.scripts
+      var templates = this.componentType.templates
+      var w = me(el)
+      evalInContext(scripts, w)
+
+      this.w = w
+      w.template = _.template(templates)
+      w.update()
+    }
+
+    Component.prototype.mixTo = function (el) {
+
+    }
+
+    function ComponentType (scripts, templates) {
+      this.scripts = scripts
+      this.templates = templates
+    }
+
+    ComponentType.createFromScript = function (shadows) {
+      var scripts = extractRegex(scriptRegex, shadows)
+      var templates = extractRegex(templateRegex, shadows)
+      return new ComponentType(scripts, templates)
+    }
+
+    ComponentType.prototype.create = function () {
+      return new Component(this)
+    }
+
+    ComponentType.prototype.createAfter = function (el) {
+      var component = this.create()
+      component.init()
+      $(el).after(component.w.el)
+      return component
+    }
+
+    return ComponentType
+  })()
 
   me.initFromScript = function (scriptEl) {
     var shadows = $(scriptEl).text()
-    return Component.create(scriptEl, shadows)
+    return ComponentType.createFromScript(shadows)
   }
 
   me.init = function () {
     $(scriptsSelector).each(function () {
-      me.initFromScript(this)
+      var componentType = me.initFromScript(this)
+
+      componentType.createAfter(this)
     })
   }
 
