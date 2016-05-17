@@ -14,7 +14,10 @@
   // @see http://stackoverflow.com/questions/8403108/calling-eval-in-particular-context
   function evalInContext (js, context) {
     /* eslint-disable no-eval */
-    return function () { return eval(js) }.call(context)
+    return function () { 
+      var self = context
+      return eval(js)
+     }.call(context)
     /* eslint-enable no-eval */
   }
 
@@ -33,8 +36,8 @@
   function addEventListener (w, ev, fun) {
     var hand = function (e) {
       me.onBeforeEvent(w, ev, e, fun)
-      fun()
-      me.onAfterEvent(w, ev, e, fun)
+      var ret = fun(e)
+      return me.onAfterEvent(w, ev, e, fun, ret)
     }
     if (w.el.addEventListener) {
       return w.el.addEventListener(ev, hand, true)
@@ -46,9 +49,13 @@
 
   me.onBeforeEvent = function () {}
 
-  me.onAfterEvent = function (w, ev, e, fun) {
-    console.log(ev, e, fun)
+  me.onAfterEvent = function (w, ev, e, fun, ret) {
+    console.log(ev, e, fun, ret)
+    if (ret && ret.skipUpdate === true) {
+      return ret.value
+    }
     w.update()
+    return ret
   }
 
   var scriptsSelector = 'script[type=waitron]'
@@ -60,9 +67,7 @@
   }
 
   function Component () {}
-  Component.prototype.init = function(parent, shadows){
-    var scripts = extractRegex(scriptRegex, shadows)
-    var templates = extractRegex(templateRegex, shadows)
+  Component.prototype.init = function (parent, scripts, templates) {
     var el = document.createElement('div')
     var w = me(el)
     $(parent).after(el)
@@ -73,11 +78,22 @@
     w.update()
   }
 
+  Component.create = function (parent, shadows) {
+    var c = new Component()
+    var scripts = extractRegex(scriptRegex, shadows)
+    var templates = extractRegex(templateRegex, shadows)
+    c.init(parent, scripts, templates)
+    return c
+  }
+
+  me.initFromScript = function (scriptEl) {
+    var shadows = $(scriptEl).text()
+    return Component.create(scriptEl, shadows)
+  }
+
   me.init = function () {
     $(scriptsSelector).each(function () {
-      var shadows = $(this).text()
-      var component = new Component();
-      component.init(this, shadows);
+      me.initFromScript(this)
     })
   }
 

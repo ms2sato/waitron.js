@@ -4,14 +4,17 @@
   <body>
     <script type="waitron">
       <template>
-        <div><%-name%></div>
+        <% for(var i = 0; i < items.length; ++i) { %>
+          <div><%-items[i]%>|<%-name%></div>
+        <% } %>
       </template>
       <initialize>
-        var self = this;
+        this.items = [1,2,3];
         this.name = "mytest!"
         this.on('click', function(){
-          alert('test');
+          //alert('test');
           self.name = "aaaaa"
+          self.items.push(self.items.length + 1)
         })
       </initialize>
     </script>
