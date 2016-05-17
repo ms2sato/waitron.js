@@ -22,7 +22,7 @@
     return {
       el: el,
       on: function (ev, func) {
-        return addEventListener(el, ev, func)
+        return addEventListener(this, ev, func)
       },
       update: function () {
         $(this.el).html(this.template(this))
@@ -30,21 +30,25 @@
     }
   }
 
-  function addEventListener (el, ev, fun) {
+  function addEventListener (w, ev, fun) {
     var hand = function (e) {
-      me.onEvent(el, ev, e, fun)
+      me.onBeforeEvent(w, ev, e, fun)
       fun()
+      me.onAfterEvent(w, ev, e, fun)
     }
-    if (el.addEventListener) {
-      return el.addEventListener(ev, hand, true)
+    if (w.el.addEventListener) {
+      return w.el.addEventListener(ev, hand, true)
     }
-    if (el.attachEvent) {
-      return el.attachEvent(ev, hand)
+    if (w.el.attachEvent) {
+      return w.el.attachEvent(ev, hand)
     }
   };
 
-  me.onEvent = function (ev, e, fun) {
+  me.onBeforeEvent = function () {}
+
+  me.onAfterEvent = function (w, ev, e, fun) {
     console.log(ev, e, fun)
+    w.update()
   }
 
   var scriptsSelector = 'script[type=waitron]'
