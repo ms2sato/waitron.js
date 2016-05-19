@@ -19,6 +19,12 @@
       </initialize>
     </script>
 
+    <template id="testTpl">
+      <h1><%-title%></h1>
+    </template>
+
+    <div id="testImpl"></div>
+
     <script src="http://underscorejs.org/underscore-min.js"></script>
     <script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
     <script src="js/waitron.js"></script>
@@ -26,5 +32,16 @@
     <script>
       w.init();
     </script>
+    <script>
+      var type = w.addType($(testTpl.content).text(), function(){
+        var self = this;
+        this.title = "テスト"
+        this.on('click', function(){
+          self.title = "ああああ"
+        });
+      })
+      var cmp = type.createAfter($('#testImpl'))
+    </script>
+
   </body>
 </html>
