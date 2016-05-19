@@ -12,8 +12,7 @@
   'use strict'
   /*global $ _ */
 
-
-  function log() {
+  function log () {
     console.log.apply(console, arguments)
   }
 
@@ -41,67 +40,69 @@
     }
   }
 
-  function onNewProperty(o, prop, newValue) {
+  me.defaultProperties = ['el', 'on', 'render']
+
+  function onNewProperty (o, prop, newValue) {
     log('onNewProperty', arguments)
   }
 
-  function onBeforeChange(o, prop, value, newValue) {
+  function onBeforeChange (o, prop, value, newValue) {
     if (!(prop in o)) {
       onNewProperty(o, prop, newValue)
     }
 
     log('onBeforeChange', arguments)
   }
-  function onAfterChange(o, prop, value, oldValue) {
+  function onAfterChange (o, prop, value, oldValue) {
     log('onAfterChange', arguments)
 
     me.tickContext.push(o.id, function () {
       o.update()
-    });
+    })
   }
 
   function listenateProp (o, prop) {
     var value = o[prop]
     Object.defineProperty(o, prop, {
       get: function () { return value },
-      set : function (newValue) {
+      set: function (newValue) {
         var oldValue = value
         onBeforeChange(o, prop, value, newValue)
         value = newValue
         onAfterChange(o, prop, value, oldValue)
       },
-      enumerable : true,
-      configurable : true
+      enumerable: true,
+      configurable: true
     })
   }
 
   // TODO: unenhance
 
-  var id_counter = 1;
+  var id_counter = 1
   me.enhance = function enhance (o) {
     if (o.__uniqueId === undefined) {
       // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
-      Object.defineProperty(o, "__uniqueId", {
-          writable: true
+      Object.defineProperty(o, '__uniqueId', {
+        writable: true
       })
 
       o.__uniqueId = id_counter++
 
-      Object.defineProperty(o, "id", {
-          get: function() {
-              return this.__uniqueId
-          }
+      Object.defineProperty(o, 'id', {
+        get: function () {
+          return this.__uniqueId
+        }
       })
     }
 
-    Object.defineProperty(o, "listeners", {
+    Object.defineProperty(o, 'listeners', {
       writable: true,
       value: {},
-      enumerable : false,
-      configurable : true
+      enumerable: false,
+      configurable: true
     })
     each(o, function (value, key) {
-      if (key == "el" || key == "on" || key == "render") return
+      if (me.defaultProperties.indexOf(key) !== -1) return
 
       listenateProp(o, key)
       o.listeners[key] = [] // FIXME: 効率化
@@ -159,7 +160,6 @@
   };
 
   var TickContext = (function () {
-
     function TickContext (scope, eventName, event, listener) {
       this.scope = scope
       this.eventName = eventName
@@ -191,15 +191,14 @@
     }
 
     return TickContext
-  })();
-
+  })()
 
   me.onBeforeEvent = function (scope, eventName, event, listener) {
     me.tickContext = new TickContext(scope, eventName, event, listener)
   }
 
   me.onAfterEvent = function (scope, eventName, event, listener, ret) {
-    log("onAfterEvent", eventName, event, listener, ret)
+    log('onAfterEvent', eventName, event, listener, ret)
     me.tickContext.execute()
     return ret
   }
@@ -292,23 +291,8 @@
     return new ComponentType(handler, el)
   }
 
-  var o = {}
-  o.test = 111
-  o.test2 = {aa: "sss"}
-
-  me.enhance(o)
-
   me.onBeforeEvent(null, 'bootstrap', null, null)
-
-  o.test = 222
-  o.test2 = {bb: "111"}
-
-  o.onChange("test", function () {
-    console.log('enhanced test called')
-  })
-
-  o.test = 333
-
+  // something on boot?
   me.onAfterEvent(null, 'bootstrap', null, null)
 
   return me
