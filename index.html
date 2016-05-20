@@ -19,9 +19,12 @@
       </initialize>
     </script>
 
-    <template id="testTpl">
-      <h1><%-title%></h1>
-    </template>
+    <script id="titleBind" type="text/template">
+      <h1 data-text="title"></h1>
+      <form>
+        <input type="text" data-value="title">
+      </form>
+    </script>
 
     <div id="testImpl"></div>
 
@@ -32,11 +35,12 @@
     <script>
       w.init();
     </script>
+
     <script>
-      var type = w.addType($(testTpl.content).text(), function(){
+      var type = w.addType(titleBind, function(){
         var self = this;
         this.title = "テスト"
-        this.on('click', function(){
+        this.find('h1').on('click', function(){ // TODO: need renderd event
           self.title = "ああああ"
         });
       })

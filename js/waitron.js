@@ -35,12 +35,59 @@
         return addEventListener(this, eventName, listener)
       },
       render: function () {
-        $(this.el).html(this.template(this))
+        var self = this
+        me.nextTick(function () {
+          me.onBeforeRender.call(self)
+          $(self.el).html(self.template(self))
+          self.find('*[data-text]').each(function () {
+            var key = $(this).data('text')
+            $(this).text(self[key])
+          })
+          me.onAfterRender.call(self)
+        })
+      },
+      sync: function (attr) {
+        var self = this
+        var $bind = this.find('*[data-text=' + attr + ']')
+        if ($bind.size() == 0) return this.render()
+
+        $bind.each(function() {
+          $(this).text(self[attr])
+        })
+      },
+      find: function () {
+        var $el = $(el)
+        return $el.find.apply($el, arguments)
       }
     }
   }
 
-  me.defaultProperties = ['el', 'on', 'render']
+  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find']
+
+  if (global.setImmediate) {
+    me.nextTick = function (func) {
+      global.setImmediate(decorateEventable(null, 'tick', func))
+    }
+  } else {
+    me.nextTick = function (func) {
+      global.setTimeout(decorateEventable(null, 'tick', func), 0)
+    }
+  }
+
+  me.onBeforeRender = function () {}
+  me.onAfterRender = function () {
+    var self = this
+    $(self.el).find('input[data-value]').each(function () {
+      var $el = $(this)
+      var key = $el.data('value')
+      addEventListener(self, 'change', function () {
+        self[key] = $el.val()
+      })
+      addEventListener(self, 'keyup', function () {
+        self[key] = $el.val()
+      })
+    })
+  }
 
   function onNewProperty (o, prop, newValue) {
     log('onNewProperty', arguments)
@@ -78,8 +125,16 @@
 
   // TODO: unenhance
 
+  me.enhanceProperties = ['id', 'onChange', 'update']
+
   var id_counter = 1
   me.enhance = function enhance (o) {
+    each(o, function (value, key) {
+      if (me.enhanceProperties.indexOf(key) !== -1) {
+        throw new Error('Cannot enhance an object having property named ' + key + '!')
+      }
+    })
+
     if (o.__uniqueId === undefined) {
       // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
       Object.defineProperty(o, '__uniqueId', {
@@ -139,8 +194,8 @@
     /* eslint-enable no-eval */
   }
 
-  function addEventListener (scope, eventName, listener) {
-    var hand = function (event) {
+  var decorateEventable = function (scope, eventName, listener) {
+    return function (event) {
       try {
         me.onBeforeEvent(scope, eventName, event, listener)
         var ret = listener(event)
@@ -151,11 +206,13 @@
         me.onEventFinally(scope, eventName, event, listener)
       }
     }
+  }
+  function addEventListener (scope, eventName, listener) {
     if (scope.el.addEventListener) {
-      return scope.el.addEventListener(eventName, hand, true)
+      return scope.el.addEventListener(eventName, decorateEventable(scope, eventName, listener), true)
     }
     if (scope.el.attachEvent) {
-      return scope.el.attachEvent(eventName, hand)
+      return scope.el.attachEvent(eventName, decorateEventable(scope, eventName, listener))
     }
   };
 
@@ -217,7 +274,7 @@
   var templateRegex = /<template>([\s\S]*)<\/template>/
   function extractRegex (regex, text) {
     var m = regex.exec(text)
-    return m[1]
+    return m[1] // TODO:join?
   }
 
   var ComponentType = (function () {
@@ -228,23 +285,35 @@
 
       var templates = this.componentType.templates
       var scope = me(el)
-      if (this.componentType.bootstrap(scope) !== false) {
-        var attrs = me.enhance(scope)
-        scope.onChange(attrs, function onChangeListener () {
-          scope.render()
-        })
-      }
+      var defaultRenderingReject = this.componentType.bootstrap(scope)
+      var attrs = me.enhance(scope)
 
+      $(el).attr('data-id', scope.id)
       this.scope = scope
       scope.template = _.template(templates)
       scope.render()
 
+      if (defaultRenderingReject !== false) {
+        each(attrs, function(attr) {
+          scope.onChange(attr, function onChangeListener () {
+            scope.sync(attr)
+          })
+        })
+      }
       return this
     }
 
-    function ComponentType (scripts, templates) {
+    function ComponentType (scripts, templates, name) {
       this.scripts = scripts
-      this.templates = templates
+
+      if (_.isString(templates)) {
+        this.templates = templates
+        this.name = name
+       }
+      else {
+        this.templates = $(templates).html()
+        this.name = name || $(templates).attr('id')
+       }
     }
 
     ComponentType.createFromScript = function (shadows) {
