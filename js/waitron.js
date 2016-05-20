@@ -49,9 +49,9 @@
       sync: function (attr) {
         var self = this
         var $bind = this.find('*[data-text=' + attr + ']')
-        if ($bind.size() == 0) return this.render()
+        if ($bind.size() === 0) return this.render()
 
-        $bind.each(function() {
+        $bind.each(function () {
           $(this).text(self.prop(attr))
         })
       },
@@ -235,6 +235,8 @@
     }
 
     TickContext.prototype.execute = function () {
+      // Q: Why unlimited loop ?
+      // A: Because of pushing func to this.queue in queue process
       for (; this.queue.length > 0 ;) {
         this.queue.shift().call(this)
       }
@@ -295,7 +297,7 @@
       scope.render()
 
       if (defaultRenderingReject !== false) {
-        each(attrs, function(attr) {
+        each(attrs, function (attr) {
           scope.onChange(attr, function onChangeListener () {
             scope.sync(attr)
           })
@@ -313,11 +315,10 @@
       if (_.isString(templates)) {
         this.templates = templates
         this.name = name
-       }
-      else {
+      } else {
         this.templates = $(templates).html()
         this.name = name || $(templates).attr('id')
-       }
+      }
     }
 
     ComponentType.createFromScript = function (shadows) {
