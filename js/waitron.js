@@ -52,17 +52,22 @@
         if ($bind.size() == 0) return this.render()
 
         $bind.each(function() {
-          $(this).text(self[attr])
+          $(this).text(self.prop(attr))
         })
       },
       find: function () {
         var $el = $(el)
         return $el.find.apply($el, arguments)
+      },
+      prop: function (key) {
+        var p = this[key]
+        if (_.isFunction(p)) return p()
+        return p
       }
     }
   }
 
-  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find']
+  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop']
 
   if (global.setImmediate) {
     me.nextTick = function (func) {
@@ -103,8 +108,8 @@
   function onAfterChange (o, prop, value, oldValue) {
     log('onAfterChange', arguments)
 
-    me.tickContext.push(o.id, function () {
-      o.update()
+    me.tickContext.push(o.id + '@' + prop, function () {
+      o.update(prop)
     })
   }
 
@@ -173,8 +178,12 @@
       }
     }
 
-    o.update = function () {
-      each(o.listeners, function (listenerArr) {
+    o.update = function (attr) {
+      if (attr) {
+        return each(o.listeners[attr], function (l) { l() })
+      }
+
+      return each(o.listeners, function (listenerArr) {
         each(listenerArr, function (l) { l() })
       })
     }
@@ -198,7 +207,7 @@
     return function (event) {
       try {
         me.onBeforeEvent(scope, eventName, event, listener)
-        var ret = listener(event)
+        var ret = listener.call(scope, event)
         return me.onAfterEvent(scope, eventName, event, listener, ret)
       } catch (ex) {
         me.onEventError(ex)
@@ -222,29 +231,21 @@
       this.eventName = eventName
       this.event = event
       this.listener = listener
-      this.actions = {}
+      this.queue = []
     }
 
     TickContext.prototype.execute = function () {
-      var self = this
-      each(this.actions, function (value, key) {
-        self.actions[key].call(self)
-      })
+      for (; this.queue.length > 0 ;) {
+        this.queue.shift().call(this)
+      }
     }
 
     TickContext.prototype.push = function (key, func) {
-      this.actions[key] = func
-    }
-
-    TickContext.prototype.valueOf = function (key) {
-      return this.actions[key]
+      this.queue.push(func)
     }
 
     TickContext.prototype.clear = function () {
-      var self = this
-      each(this.actions, function (value, key) {
-        delete self.actions[key]
-      })
+      this.queue.length = 0
     }
 
     return TickContext
@@ -300,6 +301,9 @@
           })
         })
       }
+
+      // FIXME: to addEventListener
+      scope.onRendered && decorateEventable(scope, 'rendered', scope.onRendered).call(scope)
       return this
     }
 

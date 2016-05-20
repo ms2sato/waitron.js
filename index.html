@@ -21,6 +21,7 @@
 
     <script id="titleBind" type="text/template">
       <h1 data-text="title"></h1>
+      <h2 data-text="subtitle"></h2>
       <form>
         <input type="text" data-value="title">
       </form>
@@ -40,9 +41,17 @@
       var type = w.addType(titleBind, function(){
         var self = this;
         this.title = "テスト"
-        this.find('h1').on('click', function(){ // TODO: need renderd event
-          self.title = "ああああ"
-        });
+        this.subtitle = new Date
+
+        this.onRendered = function () {
+          this.find('h1').on('click', function(){
+            self.title = "ああああ"
+          });
+
+          this.onChange('title', function () {
+            self.subtitle = self.title + new Date
+          })
+        }
       })
       var cmp = type.createAfter($('#testImpl'))
     </script>
