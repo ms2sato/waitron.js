@@ -283,12 +283,13 @@
   var ComponentType = (function () {
     function Component (componentType) { this.componentType = componentType }
 
-    Component.prototype.init = function (el) {
+    Component.prototype.init = function (params, el) {
+      params = params || {}
       el = el || document.createElement('div')
 
       var templates = this.componentType.templates
       var scope = me(el)
-      var defaultRenderingReject = this.componentType.bootstrap(scope)
+      var defaultRenderingReject = this.componentType.bootstrap(scope, params)
       var attrs = me.enhance(scope)
 
       $(el).attr('data-id', scope.id)
@@ -319,7 +320,11 @@
         this.templates = $(templates).html()
         this.name = name || $(templates).attr('id')
       }
+
+      ComponentType.list[this.name] = this
     }
+
+    ComponentType.list = {}
 
     ComponentType.createFromScript = function (shadows) {
       var scripts = extractRegex(scriptRegex, shadows)
@@ -331,18 +336,22 @@
       return new Component(this)
     }
 
-    ComponentType.prototype.createAfter = function (el) {
+    ComponentType.prototype.createAfter = function (el, params) {
       var component = this.create()
-      component.init()
+      component.init(params)
       $(el).after(component.scope.el)
       return component
     }
 
-    ComponentType.prototype.bootstrap = function (scope) {
+    ComponentType.prototype.bootstrap = function (scope, params) {
       if (typeof this.scripts === 'function') {
-        return this.scripts.call(scope)
+        return this.scripts.call(scope, params)
       }
       evalInContext(this.scripts, scope)
+    }
+
+    ComponentType.find = function (name) {
+      return ComponentType.list[name]
     }
 
     return ComponentType
@@ -363,6 +372,10 @@
 
   me.addType = function (el, handler) {
     return new ComponentType(handler, el)
+  }
+
+  me.findType = function (name) {
+    return ComponentType.find(name)
   }
 
   me.onBeforeEvent(null, 'bootstrap', null, null)

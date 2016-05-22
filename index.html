@@ -29,6 +29,13 @@
 
     <div id="testImpl"></div>
 
+    <script id="titleList" type="text/template">
+      <ul data-components="items">
+        <li data-component="titleBind"></li>
+      </ul>
+    </script>
+    <div id="titleListImpl"></div>
+
     <script src="http://underscorejs.org/underscore-min.js"></script>
     <script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
     <script src="js/waitron.js"></script>
@@ -38,7 +45,7 @@
     </script>
 
     <script>
-      var type = w.addType(titleBind, function(){
+      var type = w.addType(titleBind, function(params){
         var self = this;
         this.title = "テスト"
         this.subtitle = new Date
@@ -54,6 +61,20 @@
         }
       })
       var cmp = type.createAfter($('#testImpl'))
+    </script>
+
+    <script>
+      var type = w.addType(titleList, function(params){
+        this.items = []
+        var type = w.findType('titleBind')
+        var titleBind = type.create()
+        titleBind.init(params)
+        titleBind.scope.el
+
+        this.onRendered = function () {
+        }
+      });
+      var cmp = type.createAfter($('#titleListImpl'))
     </script>
 
   </body>
