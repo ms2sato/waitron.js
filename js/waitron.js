@@ -43,16 +43,30 @@
             var key = $(this).data('text')
             $(this).text(self[key])
           })
+
+          self.find('*[data-list]').each(function () {
+            var $list = $(this)
+            var listName = $list.data('list')
+            var list = self[listName]
+            var $itemEl = $($(this).find('*')[0])
+            $itemEl.remove()
+
+            list.each(function () {
+              $itemEl.clone().appendTo($list)
+            })
+          })
+
           me.onAfterRender.call(self)
         })
       },
       sync: function (attr) {
         var self = this
+        var value = self.prop(attr)
         var $bind = this.find('*[data-text=' + attr + ']')
         if ($bind.size() === 0) return this.render()
 
         $bind.each(function () {
-          $(this).text(self.prop(attr))
+          $(this).text(value)
         })
       },
       find: function () {
@@ -98,19 +112,24 @@
     log('onNewProperty', arguments)
   }
 
-  function onBeforeChange (o, prop, value, newValue) {
+  function onBeforePropertyChange (o, prop, value, newValue) {
     if (!(prop in o)) {
       onNewProperty(o, prop, newValue)
     }
 
-    log('onBeforeChange', arguments)
+    log('onBeforePropertyChange', arguments)
   }
-  function onAfterChange (o, prop, value, oldValue) {
-    log('onAfterChange', arguments)
+
+  function onAfterPropertyChange (o, prop, value, oldValue) {
+    log('onAfterPropertyChange', arguments)
 
     me.tickContext.push(o.id + '@' + prop, function () {
       o.update(prop)
     })
+  }
+
+  function onCollectionInserted (c, index, value) {
+    log('onCollectionInserted', arguments)
   }
 
   function listenateProp (o, prop) {
@@ -119,9 +138,9 @@
       get: function () { return value },
       set: function (newValue) {
         var oldValue = value
-        onBeforeChange(o, prop, value, newValue)
+        onBeforePropertyChange(o, prop, value, newValue)
         value = newValue
-        onAfterChange(o, prop, value, oldValue)
+        onAfterPropertyChange(o, prop, value, oldValue)
       },
       enumerable: true,
       configurable: true
@@ -190,6 +209,69 @@
 
     return Object.keys(o.listeners)
   }
+
+  me.Observer = (function () {
+    function Observer () {
+      this.listenersHash = {}
+    }
+
+    Observer.prototype.on = function (name, listener) {
+      if (!this.listenersHash[name]) {
+        this.listenersHash[name] = []
+      }
+      this.listenersHash[name].push(listener)
+    }
+
+    // TODO: off and once
+
+    Observer.prototype.trigger = function () {
+      var name = arguments.shift()
+      each(this.listenersHash[name], function (listener) {
+        listener.apply(this, arguments)
+      })
+    }
+
+    return Observer
+  })()
+
+  me.Collection = (function () {
+
+    function Collection (models) {
+      this.models = models || []
+    }
+
+    Collection.prototype = new me.Observer()
+
+    Collection.prototype.push = function (models) {}
+    Collection.prototype.at = function (index) {}
+    Collection.prototype.shift = function () {}
+    Collection.prototype.unshift = function () {}
+    Collection.prototype.pop = function () {}
+    Collection.prototype.insert = function (index, models) {
+      var params = [index, 0]
+      if (Array.isArray(models)) {
+        params.push.apply(params, models)
+      } else {
+        params.push(models)
+      }
+      this.models.splice.apply(this.models, params)
+      onCollectionInserted(this, index, models)
+    }
+    Collection.prototype.remove = function (models) {}
+    Collection.prototype.clear = function () {}
+    Collection.prototype.reset = function (models) {}
+    Collection.prototype.sort = function (comparator) {}
+    Collection.prototype.swap = function (lindex, rindex) {}
+
+    Collection.prototype.each = function (handler) {
+      each(this.models, handler)
+    }
+
+    return Collection
+  })()
+
+  var c = new me.Collection([1,2,3])
+  c.insert(2, 4)
 
   // @see http://stackoverflow.com/questions/8403108/calling-eval-in-particular-context
   function evalInContext (js, context) {

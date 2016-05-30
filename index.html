@@ -1,8 +1,9 @@
 <html>
   <head>
+    <meta charset="utf-8">
   </head>
   <body>
-    <script type="text/waitron">
+    <script type="text/waitron" type="text/template">
       <template>
         <% for(var i = 0; i < items.length; ++i) { %>
           <div><%-items[i]%>|<%-name%></div>
@@ -28,6 +29,15 @@
     </script>
 
     <div id="testImpl"></div>
+
+
+    <script id="strList" type="text/template">
+      <h3>strList</h3>
+      <ul data-list="items">
+        <li data-text="this"></li>
+      </ul>
+    </script>
+    <div id="strListImpl"></div>
 
     <script id="titleList" type="text/template">
       <ul data-components="items">
@@ -62,6 +72,22 @@
       })
       var cmp = type.createAfter($('#testImpl'))
     </script>
+
+    <script>
+      var type = w.addType(strList, function(params){
+        this.items = new w.Collection([1,2,3])
+        var self = this
+        this.onRendered = function () {
+          self.items.insert(2, 4)
+        }
+      });
+      var cmp = type.createAfter($('#strListImpl'))
+    </script>
+
+    <template id="test">
+      <template id="tt">aaaa</template>
+    </template>
+
 
     <script>
       var type = w.addType(titleList, function(params){
