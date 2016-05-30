@@ -12,6 +12,8 @@
   'use strict'
   /*global $ _ */
 
+  // utils ////////////////////////////////////////////////
+
   function log () {
     console.log.apply(console, arguments)
   }
@@ -28,58 +30,67 @@
     return o
   }
 
-  var me = function (el) {
-    return {
-      el: el,
-      on: function (eventName, listener) {
-        return addEventListener(this, eventName, listener)
-      },
-      render: function () {
-        var self = this
-        me.nextTick(function () {
-          me.onBeforeRender.call(self)
-          $(self.el).html(self.template(self))
-          self.find('*[data-text]').each(function () {
-            var key = $(this).data('text')
-            $(this).text(self[key])
-          })
+  // me ////////////////////////////////////////////////
 
-          self.find('*[data-list]').each(function () {
-            var $list = $(this)
-            var listName = $list.data('list')
-            var list = self[listName]
-            var $itemEl = $($(this).find('*')[0])
-            $itemEl.remove()
+  var Scope = (function () {
+    function Scope (el) { this.el = el }
 
-            list.each(function () {
-              $itemEl.clone().appendTo($list)
-            })
-          })
-
-          me.onAfterRender.call(self)
-        })
-      },
-      sync: function (attr) {
-        var self = this
-        var value = self.prop(attr)
-        var $bind = this.find('*[data-text=' + attr + ']')
-        if ($bind.size() === 0) return this.render()
-
-        $bind.each(function () {
-          $(this).text(value)
-        })
-      },
-      find: function () {
-        var $el = $(el)
-        return $el.find.apply($el, arguments)
-      },
-      prop: function (key) {
-        var p = this[key]
-        if (_.isFunction(p)) return p()
-        return p
-      }
+    Scope.prototype.on = function (eventName, listener) {
+      return addEventListener(this, eventName, listener)
     }
-  }
+
+    Scope.prototype.render = function () {
+      var self = this
+      me.nextTick(function () {
+        me.onBeforeRender.call(self)
+        $(self.el).html(self.template(self))
+        self.find('*[data-text]').each(function () {
+          var key = $(this).data('text')
+          $(this).text(self[key])
+        })
+
+        self.find('*[data-list]').each(function () {
+          var $list = $(this)
+          var listName = $list.data('list')
+          var list = self[listName]
+          var $itemEl = $($(this).find('*')[0])
+          $itemEl.remove()
+
+          list.each(function () {
+            $itemEl.clone().appendTo($list)
+          })
+        })
+
+        me.onAfterRender.call(self)
+      })
+    }
+
+    Scope.prototype.sync = function (attr) {
+      var self = this
+      var value = self.prop(attr)
+      var $bind = this.find('*[data-text=' + attr + ']')
+      if ($bind.size() === 0) return this.render()
+
+      $bind.each(function () {
+        $(this).text(value)
+      })
+    }
+
+    Scope.prototype.find = function () {
+      var $el = $(this.el)
+      return $el.find.apply($el, arguments)
+    }
+
+    Scope.prototype.prop = function (key) {
+      var p = this[key]
+      if (_.isFunction(p)) return p()
+      return p
+    }
+
+    return Scope
+  })()
+
+  var me = function waitron () {}
 
   me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop']
 
@@ -235,7 +246,6 @@
   })()
 
   me.Collection = (function () {
-
     function Collection (models) {
       this.models = models || []
     }
@@ -270,8 +280,8 @@
     return Collection
   })()
 
-  var c = new me.Collection([1,2,3])
-  c.insert(2, 4)
+  // var c = new me.Collection([1, 2, 3])
+  // c.insert(2, 4)
 
   // @see http://stackoverflow.com/questions/8403108/calling-eval-in-particular-context
   function evalInContext (js, context) {
@@ -305,7 +315,7 @@
     if (scope.el.attachEvent) {
       return scope.el.attachEvent(eventName, decorateEventable(scope, eventName, listener))
     }
-  };
+  }
 
   var TickContext = (function () {
     function TickContext (scope, eventName, event, listener) {
@@ -370,7 +380,7 @@
       el = el || document.createElement('div')
 
       var templates = this.componentType.templates
-      var scope = me(el)
+      var scope = new Scope(el)
       var defaultRenderingReject = this.componentType.bootstrap(scope, params)
       var attrs = me.enhance(scope)
 
