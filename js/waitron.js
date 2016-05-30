@@ -452,7 +452,7 @@
     })
   }
 
-  me.addType = function (el, handler) {
+  me.mount = function (el, handler) {
     return new ComponentType(handler, el)
   }
 
