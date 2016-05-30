@@ -36,7 +36,12 @@
     function Scope (el) { this.el = el }
 
     Scope.prototype.on = function (eventName, listener) {
-      return addEventListener(this, eventName, listener)
+      if (arguments.length === 2) return addEventListener(this, eventName, listener)
+      else return this.bind.apply(this, arguments)
+    }
+
+    Scope.prototype.bind = function (selector, eventName, listener) {
+      return addEventListener(this, eventName, listener, $(this.el).find(selector)[0])
     }
 
     Scope.prototype.render = function () {
@@ -60,6 +65,9 @@
             $itemEl.clone().appendTo($list)
           })
         })
+
+        // FIXME: to addEventListener
+        self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self)
 
         me.onAfterRender.call(self)
       })
@@ -308,12 +316,13 @@
       }
     }
   }
-  function addEventListener (scope, eventName, listener) {
-    if (scope.el.addEventListener) {
-      return scope.el.addEventListener(eventName, decorateEventable(scope, eventName, listener), true)
+  function addEventListener (scope, eventName, listener, el) {
+    el = el || scope.el
+    if (el.addEventListener) {
+      return el.addEventListener(eventName, decorateEventable(scope, eventName, listener), true)
     }
-    if (scope.el.attachEvent) {
-      return scope.el.attachEvent(eventName, decorateEventable(scope, eventName, listener))
+    if (el.attachEvent) {
+      return el.attachEvent(eventName, decorateEventable(scope, eventName, listener))
     }
   }
 
@@ -397,8 +406,6 @@
         })
       }
 
-      // FIXME: to addEventListener
-      scope.onRendered && decorateEventable(scope, 'rendered', scope.onRendered).call(scope)
       return this
     }
 
@@ -437,7 +444,7 @@
 
     ComponentType.prototype.bootstrap = function (scope, params) {
       if (typeof this.scripts === 'function') {
-        return this.scripts.call(scope, params)
+        return this.scripts.call(scope, params, scope)
       }
       evalInContext(this.scripts, scope)
     }
@@ -466,7 +473,7 @@
     return new ComponentType(handler, el)
   }
 
-  me.findType = function (name) {
+  me.find = function (name) {
     return ComponentType.find(name)
   }
 

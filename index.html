@@ -55,22 +55,24 @@
       </form>
     </template>
     <script>
-      var type = w.mount(titleBind, function(params){
-        var self = this;
+      w.mount(titleBind, function(params, scope){
         this.title = "テスト"
         this.subtitle = new Date
 
         this.onRendered = function () {
-          this.find('h1').on('click', function(){
-            self.title = "ああああ"
+          var el = this.on('h1', 'click', function(){
+            scope.title = "ああああ"
           });
 
           this.onChange('title', function () {
-            self.subtitle = self.title + new Date
+            scope.subtitle = scope.title + new Date
           })
         }
       })
-      var cmp = type.createAfter($('#testImpl'))
+    </script>
+
+    <script>
+      w.find('titleBind').createAfter($('#testImpl'))
     </script>
 
     <script>
@@ -92,7 +94,7 @@
     <script>
       var type = w.mount(titleList, function(params){
         this.items = []
-        var type = w.findType('titleBind')
+        var type = w.find('titleBind')
         var titleBind = type.create()
         titleBind.init(params)
         titleBind.scope.el
