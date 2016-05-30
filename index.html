@@ -24,19 +24,19 @@
     <div id="testImpl"></div>
 
 
-    <script id="strList" type="text/template">
+    <template id="strList">
       <h3>strList</h3>
       <ul data-list="items">
         <li data-text="this"></li>
       </ul>
-    </script>
+    </template>
     <div id="strListImpl"></div>
 
-    <script id="titleList" type="text/template">
+    <template id="titleList">
       <ul data-components="items">
         <li data-component="titleBind"></li>
       </ul>
-    </script>
+    </template>
     <div id="titleListImpl"></div>
 
     <script src="http://underscorejs.org/underscore-min.js"></script>
@@ -47,13 +47,13 @@
       w.init();
     </script>
 
-    <script id="titleBind" type="text/template">
+    <template id="titleBind">
       <h1 data-text="title"></h1>
       <h2 data-text="subtitle"></h2>
       <form>
         <input type="text" data-value="title">
       </form>
-    </script>
+    </template>
     <script>
       var type = w.mount(titleBind, function(params){
         var self = this;
