@@ -9,9 +9,8 @@
   /* eslint-enable no-undef */
 }))(typeof window !== 'undefined' ? window : this, (global, undefined) => {
   /*global $ _ */
-
+  function test(){}
   // utils ////////////////////////////////////////////////
-
   function log () {
     console.log.apply(console, arguments)
   }

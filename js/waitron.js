@@ -21,9 +21,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   /* eslint-enable no-undef */
 })(typeof window !== 'undefined' ? window : undefined, function (global, undefined) {
   /*global $ _ */
-
+  function test() {}
   // utils ////////////////////////////////////////////////
-
   function log() {
     console.log.apply(console, arguments);
   }
