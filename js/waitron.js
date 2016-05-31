@@ -19,9 +19,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     global.w = me;
   }
   /* eslint-enable no-undef */
-})(typeof window !== 'undefined' ? window : undefined, function (global, undefined) {
+})(typeof window !== 'undefined' ? window : undefined, function (global) {
   /*global $ _ */
-  function test() {}
+
   // utils ////////////////////////////////////////////////
   function log() {
     console.log.apply(console, arguments);
