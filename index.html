@@ -55,16 +55,16 @@
       </form>
     </template>
     <script>
-      w.mount(titleBind, function(params, scope){
-        this.title = "テスト"
-        this.subtitle = new Date
+      w.mount(titleBind, (params, scope) => {
+        scope.title = "テスト"
+        scope.subtitle = new Date
 
-        this.onRendered = function () {
-          var el = this.on('h1', 'click', function(){
+        scope.onRendered =  () => {
+          var el = scope.on('h1', 'click', function(){
             scope.title = "ああああ"
-          });
+          })
 
-          this.onChange('title', function () {
+          scope.onChange('title',  () => {
             scope.subtitle = scope.title + new Date
           })
         }
