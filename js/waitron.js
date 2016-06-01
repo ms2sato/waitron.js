@@ -42,223 +42,41 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }
 
   // me ////////////////////////////////////////////////
-
-  var Scope = function () {
-    function Scope(el) {
-      _classCallCheck(this, Scope);
-
-      this.el = el;
-    }
-
-    _createClass(Scope, [{
-      key: 'on',
-      value: function on(eventName, listener) {
-        if (arguments.length === 2) return addEventListener(this, eventName, listener);else return this.onit.apply(this, arguments);
-      }
-    }, {
-      key: 'onit',
-      value: function onit(selector, eventName, listener) {
-        return addEventListener(this, eventName, listener, this.find(selector));
-      }
-    }, {
-      key: 'render',
-      value: function render() {
-        var self = this;
-        me.nextTick(function () {
-          me.onBeforeRender.call(self);
-          $(self.el).html(self.template(self));
-          self.find('*[data-text]').each(function () {
-            var key = $(this).data('text');
-            $(this).text(self[key]);
-          });
-
-          self.find('*[data-list]').each(function () {
-            var $list = $(this);
-            var listName = $list.data('list');
-            var list = self[listName];
-            var $itemEl = $($(this).find('*')[0]);
-            $itemEl.remove();
-
-            list.each(function () {
-              $itemEl.clone().appendTo($list);
-            });
-          });
-
-          // FIXME: to addEventListener
-          self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self);
-
-          me.onAfterRender.call(self);
-        });
-      }
-    }, {
-      key: 'sync',
-      value: function sync(attr) {
-        var self = this;
-        var value = self.prop(attr);
-        var $bind = this.find('*[data-text=' + attr + ']');
-        if ($bind.size() === 0) return this.render();
-
-        $bind.each(function () {
-          $(this).text(value);
-        });
-      }
-    }, {
-      key: 'find',
-      value: function find() {
-        var $el = $(this.el);
-        return $el.find.apply($el, arguments);
-      }
-    }, {
-      key: 'prop',
-      value: function prop(key) {
-        var p = this[key];
-        if (_.isFunction(p)) return p();
-        return p;
-      }
-    }]);
-
-    return Scope;
-  }();
-
   var me = function waitron() {};
 
-  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop'];
-
-  if (global.setImmediate) {
-    me.nextTick = function (func) {
-      global.setImmediate(decorateEventable(null, 'tick', func));
-    };
-  } else {
-    me.nextTick = function (func) {
-      global.setTimeout(decorateEventable(null, 'tick', func), 0);
-    };
-  }
-
-  me.onBeforeRender = function () {};
-  me.onAfterRender = function () {
-    var self = this;
-    $(self.el).find('input[data-value]').each(function () {
-      var $el = $(this);
-      var key = $el.data('value');
-      addEventListener(self, 'change', function () {
-        self[key] = $el.val();
-      });
-      addEventListener(self, 'keyup', function () {
-        self[key] = $el.val();
-      });
-    });
-  };
-
-  function onNewProperty(o, prop, newValue) {
-    log('onNewProperty', arguments);
-  }
-
-  function onBeforePropertyChange(o, prop, value, newValue) {
-    if (!(prop in o)) {
-      onNewProperty(o, prop, newValue);
-    }
-
-    log('onBeforePropertyChange', arguments);
-  }
-
-  function onAfterPropertyChange(o, prop, value, oldValue) {
-    log('onAfterPropertyChange', arguments);
-
-    me.tickContext.push(o.id + '@' + prop, function () {
-      o.update(prop);
-    });
-  }
-
-  function onCollectionInserted(c, index, value) {
-    log('onCollectionInserted', arguments);
-  }
-
-  function listenateProp(o, prop) {
-    var value = o[prop];
-    Object.defineProperty(o, prop, {
-      get: function get() {
-        return value;
-      },
-      set: function set(newValue) {
-        var oldValue = value;
-        onBeforePropertyChange(o, prop, value, newValue);
-        value = newValue;
-        onAfterPropertyChange(o, prop, value, oldValue);
-      },
-
-      enumerable: true,
-      configurable: true
-    });
-  }
-
-  // TODO: unenhance
-
-  me.enhanceProperties = ['id', 'onChange', 'update'];
-
-  var id_counter = 1;
-  me.enhance = function enhance(o) {
-    _each(o, function (value, key) {
-      if (me.enhanceProperties.indexOf(key) !== -1) {
-        throw new Error('Cannot enhance an object having property named ' + key + '!');
-      }
-    });
-
-    if (o.__uniqueId === undefined) {
-      // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
-      Object.defineProperty(o, '__uniqueId', {
-        writable: true
-      });
-
-      o.__uniqueId = id_counter++;
-
-      Object.defineProperty(o, 'id', {
-        get: function get() {
-          return this.__uniqueId;
-        }
+  function delegate(prototype, name, to) {
+    if (Array.isArray(name)) {
+      return _each(name, function (n) {
+        delegate(prototype, n, to);
       });
     }
 
-    Object.defineProperty(o, 'listeners', {
-      writable: true,
-      value: {},
-      enumerable: false,
-      configurable: true
-    });
-    _each(o, function (value, key) {
-      if (me.defaultProperties.indexOf(key) !== -1) return;
+    prototype[name] = function () {
+      this[to][name].apply(this[to], arguments);
+    };
+  }
 
-      listenateProp(o, key);
-      o.listeners[key] = []; // FIXME: 効率化
-    });
-
-    o.onChange = function (key, listener) {
-      if (Array.isArray(key)) {
-        _each(key, function (k) {
-          o.listeners[k].push(listener);
+  var identify = function () {
+    var id_counter = 1;
+    return function identify(o) {
+      if (o.__uniqueId === undefined) {
+        // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
+        Object.defineProperty(o, '__uniqueId', {
+          writable: true
         });
-      } else {
-        o.listeners[key].push(listener);
+
+        o.__uniqueId = id_counter++;
+
+        Object.defineProperty(o, 'id', {
+          get: function get() {
+            return this.__uniqueId;
+          }
+        });
       }
     };
+  }();
 
-    o.update = function (attr) {
-      if (attr) {
-        return _each(o.listeners[attr], function (l) {
-          l();
-        });
-      }
-
-      return _each(o.listeners, function (listenerArr) {
-        _each(listenerArr, function (l) {
-          l();
-        });
-      });
-    };
-
-    return Object.keys(o.listeners);
-  };
-
-  me.Observer = function () {
+  var Observer = function () {
     function Observer() {
       _classCallCheck(this, Observer);
 
@@ -276,9 +94,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'trigger',
       value: function trigger() {
-        var name = arguments.shift();
+        var _this = this,
+            _arguments = arguments;
+
+        var name = Array.prototype.shift.call(arguments);
         _each(this.listenersHash[name], function (listener) {
-          listener.apply(this, arguments);
+          listener.apply(_this, _arguments);
         });
       }
     }]);
@@ -286,16 +107,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return Observer;
   }();
 
-  me.Collection = function (_me$Observer) {
-    _inherits(Collection, _me$Observer);
+  var Collection = function (_Observer) {
+    _inherits(Collection, _Observer);
 
     function Collection(models) {
       _classCallCheck(this, Collection);
 
-      var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(Collection).call(this));
+      var _this2 = _possibleConstructorReturn(this, Object.getPrototypeOf(Collection).call(this));
 
-      _this.models = models || [];
-      return _this;
+      _this2.models = models || [];
+      return _this2;
     }
 
     _createClass(Collection, [{
@@ -348,7 +169,207 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }]);
 
     return Collection;
-  }(me.Observer);
+  }(Observer);
+
+  // me ////////////////////////////////////////////////
+
+  function listenate(o) {
+    function listenateProp(o, prop) {
+      var value = o[prop];
+      Object.defineProperty(o, prop, {
+        get: function get() {
+          return value;
+        },
+        set: function set(newValue) {
+          var oldValue = value;
+          onBeforePropertyChange(o, prop, value, newValue);
+          value = newValue;
+          onAfterPropertyChange(o, prop, value, oldValue);
+        },
+
+        enumerable: true,
+        configurable: true
+      });
+    }
+
+    var ret = [];
+    _each(o, function (value, key) {
+      if (me.defaultProperties.indexOf(key) !== -1) return;
+
+      listenateProp(o, key);
+      ret.push(key);
+    });
+    return ret;
+  }
+
+  var Scope = function () {
+    function Scope(params) {
+      _classCallCheck(this, Scope);
+
+      this.el = params.el;
+      this.templates = params.templates;
+      this.scripts = params.scripts;
+      this.options = params.options;
+      this.observer = new Observer();
+
+      identify(this);
+    }
+
+    _createClass(Scope, [{
+      key: 'bootstrap',
+      value: function bootstrap() {
+        var _this3 = this;
+
+        var self = this;
+        if (typeof this.scripts === 'function') {
+          this.scripts(this.options, this);
+        } else {
+          evalInContext(this.scripts, this);
+        }
+
+        var attrs = listenate(this);
+        var scopeRegex = /\{([\s\S]*)\}/;
+
+        $(this.el).attr('data-id', this.id);
+        this.template = $(this.templates);
+        console.log(this.templates);
+        this.template.each(function (i, el) {
+          _each(el.attributes, function (val, key) {
+            var m = scopeRegex.exec(val.textContent);
+            if (m) {
+              addEventListener(self, val.nodeName.substr(2), function (e) {
+                self[m[1]](e);
+              }, el);
+              $(el).removeAttr(val.nodeName);
+            }
+          });
+        });
+
+        this.render();
+
+        _each(attrs, function (attr) {
+          _this3.on(attr, function () {
+            _this3.sync(attr);
+          });
+        });
+      }
+    }, {
+      key: 'render',
+      value: function render() {
+        var self = this;
+        me.nextTick(function () {
+          me.onBeforeRender.call(self);
+          $(self.el).html(self.template);
+          self.find('*[data-text]').each(function () {
+            var key = $(this).data('text');
+            $(this).text(self[key]);
+          });
+
+          self.find('*[data-list]').each(function () {
+            var $list = $(this);
+            var listName = $list.data('list');
+            var list = self[listName];
+            var $itemEl = $($(this).find('*')[0]);
+            $itemEl.remove();
+
+            list.each(function () {
+              $itemEl.clone().appendTo($list);
+            });
+          });
+
+          // FIXME: to addEventListener
+          self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self);
+
+          me.onAfterRender.call(self);
+        });
+      }
+    }, {
+      key: 'sync',
+      value: function sync(attr) {
+        var self = this;
+        var value = self.prop(attr);
+        var $bind = this.find('*[data-text=' + attr + ']');
+        if ($bind.size() === 0) return this.render();
+
+        $bind.each(function () {
+          $(this).text(value);
+        });
+      }
+    }, {
+      key: 'update',
+      value: function update(attr) {
+        return this.sync(attr);
+      }
+    }, {
+      key: 'find',
+      value: function find() {
+        var $el = $(this.el);
+        return $el.find.apply($el, arguments);
+      }
+    }, {
+      key: 'prop',
+      value: function prop(key) {
+        var p = this[key];
+        if (_.isFunction(p)) return p();
+        return p;
+      }
+    }]);
+
+    return Scope;
+  }();
+
+  delegate(Scope.prototype, ['on', 'trigger'], 'observer');
+
+  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop', 'trigger', 'bootstrap', 'observer'];
+
+  if (global.setImmediate) {
+    me.nextTick = function (func) {
+      global.setImmediate(decorateEventable(null, 'tick', func));
+    };
+  } else {
+    me.nextTick = function (func) {
+      global.setTimeout(decorateEventable(null, 'tick', func), 0);
+    };
+  }
+
+  me.onBeforeRender = function () {};
+  me.onAfterRender = function () {
+    var self = this;
+    $(self.el).find('input[data-value]').each(function () {
+      var $el = $(this);
+      var key = $el.data('value');
+      addEventListener(self, 'change', function () {
+        self[key] = $el.val();
+      });
+      addEventListener(self, 'keyup', function () {
+        self[key] = $el.val();
+      });
+    });
+  };
+
+  function onNewProperty(o, prop, newValue) {
+    log('onNewProperty', arguments);
+  }
+
+  function onBeforePropertyChange(o, prop, value, newValue) {
+    if (!(prop in o)) {
+      onNewProperty(o, prop, newValue);
+    }
+
+    log('onBeforePropertyChange', arguments);
+  }
+
+  function onAfterPropertyChange(o, prop, value, oldValue) {
+    log('onAfterPropertyChange', arguments);
+
+    me.tickContext.push(o.id + '@' + prop, function () {
+      o.trigger(prop);
+    });
+  }
+
+  function onCollectionInserted(c, index, value) {
+    log('onCollectionInserted', arguments);
+  }
 
   // var c = new me.Collection([1, 2, 3])
   // c.insert(2, 4)
@@ -462,27 +483,17 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       _createClass(Component, [{
         key: 'init',
         value: function init() {
-          var params = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
+          var options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
           var el = arguments.length <= 1 || arguments[1] === undefined ? document.createElement('div') : arguments[1];
 
-          var templates = this.componentType.templates;
-          var scope = new Scope(el);
-          var defaultRenderingReject = this.componentType.bootstrap(scope, params);
-          var attrs = me.enhance(scope);
-
-          $(el).attr('data-id', scope.id);
+          var scope = new Scope({
+            el: el,
+            templates: this.componentType.templates,
+            scripts: this.componentType.scripts,
+            options: options
+          });
           this.scope = scope;
-          scope.template = _.template(templates);
-          scope.render();
-
-          if (defaultRenderingReject !== false) {
-            _each(attrs, function (attr) {
-              scope.onChange(attr, function onChangeListener() {
-                scope.sync(attr);
-              });
-            });
-          }
-
+          scope.bootstrap();
           return this;
         }
       }]);
@@ -519,14 +530,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           component.init(params);
           $(el).after(component.scope.el);
           return component;
-        }
-      }, {
-        key: 'bootstrap',
-        value: function bootstrap(scope, params) {
-          if (typeof this.scripts === 'function') {
-            return this.scripts.bind(scope).call(scope, params, scope);
-          }
-          evalInContext(this.scripts, scope);
         }
       }]);
 
@@ -573,5 +576,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   // something on boot?
   me.onAfterEvent(null, 'bootstrap', null, null);
 
+  me.Observer = Observer;
+  me.Collection = Collection;
   return me;
 });

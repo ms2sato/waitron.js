@@ -28,24 +28,171 @@
   }
 
   // me ////////////////////////////////////////////////
+  var me = function waitron () {}
 
-  class Scope {
-    constructor (el) { this.el = el }
-
-    on (eventName, listener) {
-      if (arguments.length === 2) return addEventListener(this, eventName, listener)
-      else return this.onit.apply(this, arguments)
+  function delegate (prototype, name, to) {
+    if (Array.isArray(name)) {
+      return each(name, (n) => {
+        delegate(prototype, n, to)
+      })
     }
 
-    onit (selector, eventName, listener) {
-      return addEventListener(this, eventName, listener, this.find(selector))
+    prototype[name] = function () {
+      this[to][name].apply(this[to], arguments)
+    }
+  }
+
+  const identify = (() => {
+    let id_counter = 1
+    return function identify (o) {
+      if (o.__uniqueId === undefined) {
+        // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
+        Object.defineProperty(o, '__uniqueId', {
+          writable: true
+        })
+
+        o.__uniqueId = id_counter++
+
+        Object.defineProperty(o, 'id', {
+          get () {
+            return this.__uniqueId
+          }
+        })
+      }
+    }
+  })()
+
+  class Observer {
+    constructor () {
+      this.listenersHash = {}
+    }
+
+    on (name, listener) {
+      if (!this.listenersHash[name]) {
+        this.listenersHash[name] = []
+      }
+      this.listenersHash[name].push(listener)
+    }
+
+    trigger () {
+      const name = Array.prototype.shift.call(arguments)
+      each(this.listenersHash[name], (listener) => {
+        listener.apply(this, arguments)
+      })
+    }
+  }
+
+  class Collection extends Observer {
+    constructor (models) {
+      super()
+      this.models = models || []
+    }
+
+    push (models) {}
+    at (index) {}
+    shift () {}
+    unshift () {}
+    pop () {}
+
+    insert (index, models) {
+      const params = [index, 0]
+      if (Array.isArray(models)) {
+        params.push.apply(params, models)
+      } else {
+        params.push(models)
+      }
+      this.models.splice.apply(this.models, params)
+      onCollectionInserted(this, index, models)
+    }
+
+    remove (models) {}
+    clear () {}
+    reset (models) {}
+    sort (comparator) {}
+    swap (lindex, rindex) {}
+
+    each (handler) {
+      each(this.models, handler)
+    }
+  }
+
+  // me ////////////////////////////////////////////////
+
+  function listenate (o) {
+    function listenateProp (o, prop) {
+      let value = o[prop]
+      Object.defineProperty(o, prop, {
+        get () { return value },
+        set (newValue) {
+          const oldValue = value
+          onBeforePropertyChange(o, prop, value, newValue)
+          value = newValue
+          onAfterPropertyChange(o, prop, value, oldValue)
+        },
+        enumerable: true,
+        configurable: true
+      })
+    }
+
+    const ret = []
+    each(o, (value, key) => {
+      if (me.defaultProperties.indexOf(key) !== -1) return
+
+      listenateProp(o, key)
+      ret.push(key)
+    })
+    return ret
+  }
+
+  class Scope {
+    constructor (params) {
+      this.el = params.el
+      this.templates = params.templates
+      this.scripts = params.scripts
+      this.options = params.options
+      this.observer = new Observer()
+
+      identify(this)
+    }
+
+    bootstrap () {
+      const self = this
+      if (typeof this.scripts === 'function') {
+        this.scripts(this.options, this)
+      } else {
+        evalInContext(this.scripts, this)
+      }
+
+      const attrs = listenate(this)
+      const scopeRegex = /\{([\s\S]*)\}/
+
+      $(this.el).attr('data-id', this.id)
+      this.template = $(this.templates)
+      console.log(this.templates)
+      this.template.each(function (i, el) {
+        each(el.attributes, (val, key) => {
+          const m = scopeRegex.exec(val.textContent)
+          if (m) {
+            addEventListener(self, val.nodeName.substr(2), (e) => {
+              self[m[1]](e)
+            }, el)
+            $(el).removeAttr(val.nodeName)
+          }
+        })
+      })
+
+      this.render()
+
+      each(attrs, attr => {
+        this.on(attr, () => { this.sync(attr) })
+      })
     }
 
     render () {
       const self = this
       me.nextTick(() => {
         me.onBeforeRender.call(self)
-        $(self.el).html(self.template(self))
+        $(self.el).html(self.template)
         self.find('*[data-text]').each(function () {
           const key = $(this).data('text')
           $(this).text(self[key])
@@ -81,6 +228,10 @@
       })
     }
 
+    update (attr) {
+      return this.sync(attr)
+    }
+
     find () {
       const $el = $(this.el)
       return $el.find.apply($el, arguments)
@@ -93,9 +244,9 @@
     }
   }
 
-  var me = function waitron () {}
+  delegate(Scope.prototype, ['on', 'trigger'], 'observer')
 
-  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop']
+  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop', 'trigger', 'bootstrap', 'observer']
 
   if (global.setImmediate) {
     me.nextTick = func => {
@@ -138,144 +289,12 @@
     log('onAfterPropertyChange', arguments)
 
     me.tickContext.push(`${o.id}@${prop}`, () => {
-      o.update(prop)
+      o.trigger(prop)
     })
   }
 
   function onCollectionInserted (c, index, value) {
     log('onCollectionInserted', arguments)
-  }
-
-  function listenateProp (o, prop) {
-    let value = o[prop]
-    Object.defineProperty(o, prop, {
-      get () { return value },
-      set (newValue) {
-        const oldValue = value
-        onBeforePropertyChange(o, prop, value, newValue)
-        value = newValue
-        onAfterPropertyChange(o, prop, value, oldValue)
-      },
-      enumerable: true,
-      configurable: true
-    })
-  }
-
-  // TODO: unenhance
-
-  me.enhanceProperties = ['id', 'onChange', 'update']
-
-  let id_counter = 1
-  me.enhance = function enhance (o) {
-    each(o, (value, key) => {
-      if (me.enhanceProperties.indexOf(key) !== -1) {
-        throw new Error(`Cannot enhance an object having property named ${key}!`)
-      }
-    })
-
-    if (o.__uniqueId === undefined) {
-      // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
-      Object.defineProperty(o, '__uniqueId', {
-        writable: true
-      })
-
-      o.__uniqueId = id_counter++
-
-      Object.defineProperty(o, 'id', {
-        get () {
-          return this.__uniqueId
-        }
-      })
-    }
-
-    Object.defineProperty(o, 'listeners', {
-      writable: true,
-      value: {},
-      enumerable: false,
-      configurable: true
-    })
-    each(o, (value, key) => {
-      if (me.defaultProperties.indexOf(key) !== -1) return
-
-      listenateProp(o, key)
-      o.listeners[key] = [] // FIXME: 効率化
-    })
-
-    o.onChange = (key, listener) => {
-      if (Array.isArray(key)) {
-        each(key, k => {
-          o.listeners[k].push(listener)
-        })
-      } else {
-        o.listeners[key].push(listener)
-      }
-    }
-
-    o.update = attr => {
-      if (attr) {
-        return each(o.listeners[attr], l => { l() })
-      }
-
-      return each(o.listeners, listenerArr => {
-        each(listenerArr, l => { l() })
-      })
-    }
-
-    return Object.keys(o.listeners)
-  }
-
-  me.Observer = class Observer {
-    constructor () {
-      this.listenersHash = {}
-    }
-
-    on (name, listener) {
-      if (!this.listenersHash[name]) {
-        this.listenersHash[name] = []
-      }
-      this.listenersHash[name].push(listener)
-    }
-
-    trigger () {
-      const name = arguments.shift()
-      each(this.listenersHash[name], function (listener) {
-        listener.apply(this, arguments)
-      })
-    }
-  }
-
-  me.Collection = class Collection extends me.Observer {
-    constructor (models) {
-      super()
-      this.models = models || []
-    }
-
-    push (models) {}
-    at (index) {}
-    shift () {}
-    unshift () {}
-    pop () {}
-
-    insert (index, models) {
-      const params = [index, 0]
-      if (Array.isArray(models)) {
-        params.push.apply(params, models)
-      } else {
-        params.push(models)
-      }
-      this.models.splice.apply(this.models, params)
-      onCollectionInserted(this, index, models)
-    }
-
-    remove (models) {}
-    clear () {}
-    reset (models) {}
-    sort (comparator) {}
-    swap (lindex, rindex) {}
-
-    each (handler) {
-      each(this.models, handler)
-    }
   }
 
   // var c = new me.Collection([1, 2, 3])
@@ -370,25 +389,15 @@
     class Component {
       constructor (componentType) { this.componentType = componentType }
 
-      init (params = {}, el = document.createElement('div')) {
-        const templates = this.componentType.templates
-        const scope = new Scope(el)
-        const defaultRenderingReject = this.componentType.bootstrap(scope, params)
-        const attrs = me.enhance(scope)
-
-        $(el).attr('data-id', scope.id)
+      init (options = {}, el = document.createElement('div')) {
+        const scope = new Scope({
+          el: el,
+          templates: this.componentType.templates,
+          scripts: this.componentType.scripts,
+          options: options
+        })
         this.scope = scope
-        scope.template = _.template(templates)
-        scope.render()
-
-        if (defaultRenderingReject !== false) {
-          each(attrs, attr => {
-            scope.onChange(attr, function onChangeListener () {
-              scope.sync(attr)
-            })
-          })
-        }
-
+        scope.bootstrap()
         return this
       }
     }
@@ -417,13 +426,6 @@
         component.init(params)
         $(el).after(component.scope.el)
         return component
-      }
-
-      bootstrap (scope, params) {
-        if (typeof this.scripts === 'function') {
-          return this.scripts.bind(scope).call(scope, params, scope)
-        }
-        evalInContext(this.scripts, scope)
       }
     }
 
@@ -461,5 +463,7 @@
   // something on boot?
   me.onAfterEvent(null, 'bootstrap', null, null)
 
+  me.Observer = Observer
+  me.Collection = Collection
   return me
 })
