@@ -34,11 +34,11 @@
 
     on (eventName, listener) {
       if (arguments.length === 2) return addEventListener(this, eventName, listener)
-      else return this.bind.apply(this, arguments)
+      else return this.onit.apply(this, arguments)
     }
 
-    bind (selector, eventName, listener) {
-      return addEventListener(this, eventName, listener, $(this.el).find(selector)[0])
+    onit (selector, eventName, listener) {
+      return addEventListener(this, eventName, listener, this.find(selector))
     }
 
     render () {
@@ -224,7 +224,7 @@
     return Object.keys(o.listeners)
   }
 
-  class Observer {
+  me.Observer = class Observer {
     constructor () {
       this.listenersHash = {}
     }
@@ -244,9 +244,7 @@
     }
   }
 
-  me.Observer = Observer
-
-  class Collection extends Observer {
+  me.Collection = class Collection extends me.Observer {
     constructor (models) {
       super()
       this.models = models || []
@@ -279,8 +277,6 @@
       each(this.models, handler)
     }
   }
-
-  me.Collection = Collection
 
   // var c = new me.Collection([1, 2, 3])
   // c.insert(2, 4)
@@ -329,7 +325,7 @@
     execute () {
       // Q: Why unlimited loop ?
       // A: Because of pushing func to this.queue in queue process
-      for (; this.queue.length > 0 ;) {
+      for (; this.queue.length > 0;) {
         this.queue.shift().call(this)
       }
     }
@@ -425,7 +421,7 @@
 
       bootstrap (scope, params) {
         if (typeof this.scripts === 'function') {
-          return this.scripts.call(scope, params, scope)
+          return this.scripts.bind(scope).call(scope, params, scope)
         }
         evalInContext(this.scripts, scope)
       }

@@ -53,12 +53,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     _createClass(Scope, [{
       key: 'on',
       value: function on(eventName, listener) {
-        if (arguments.length === 2) return addEventListener(this, eventName, listener);else return this.bind.apply(this, arguments);
+        if (arguments.length === 2) return addEventListener(this, eventName, listener);else return this.onit.apply(this, arguments);
       }
     }, {
-      key: 'bind',
-      value: function bind(selector, eventName, listener) {
-        return addEventListener(this, eventName, listener, $(this.el).find(selector)[0]);
+      key: 'onit',
+      value: function onit(selector, eventName, listener) {
+        return addEventListener(this, eventName, listener, this.find(selector));
       }
     }, {
       key: 'render',
@@ -258,7 +258,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return Object.keys(o.listeners);
   };
 
-  var Observer = function () {
+  me.Observer = function () {
     function Observer() {
       _classCallCheck(this, Observer);
 
@@ -286,10 +286,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return Observer;
   }();
 
-  me.Observer = Observer;
-
-  var Collection = function (_Observer) {
-    _inherits(Collection, _Observer);
+  me.Collection = function (_me$Observer) {
+    _inherits(Collection, _me$Observer);
 
     function Collection(models) {
       _classCallCheck(this, Collection);
@@ -350,9 +348,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }]);
 
     return Collection;
-  }(Observer);
-
-  me.Collection = Collection;
+  }(me.Observer);
 
   // var c = new me.Collection([1, 2, 3])
   // c.insert(2, 4)
@@ -528,7 +524,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         key: 'bootstrap',
         value: function bootstrap(scope, params) {
           if (typeof this.scripts === 'function') {
-            return this.scripts.call(scope, params, scope);
+            return this.scripts.bind(scope).call(scope, params, scope);
           }
           evalInContext(this.scripts, scope);
         }
