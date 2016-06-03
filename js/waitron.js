@@ -20,7 +20,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }
   /* eslint-enable no-undef */
 })(typeof window !== 'undefined' ? window : undefined, function (global) {
-  /*global $ _ */
+  /*global $ */
 
   // utils ////////////////////////////////////////////////
   function log() {
@@ -218,22 +218,41 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     _createClass(Scope, [{
       key: 'bootstrap',
       value: function bootstrap() {
-        var _this3 = this;
-
-        var self = this;
         if (typeof this.scripts === 'function') {
           this.scripts(this.options, this);
         } else {
           evalInContext(this.scripts, this);
         }
 
-        var attrs = listenate(this);
-        var scopeRegex = /\{([\s\S]*)\}/;
+        listenate(this);
 
         $(this.el).attr('data-id', this.id);
         this.template = $(this.templates);
         console.log(this.templates);
-        this.template.each(function (i, el) {
+
+        this.scan();
+        this.render();
+      }
+    }, {
+      key: 'scanElm',
+      value: function scanElm(el) {
+        var _this3 = this;
+
+        var scopeRegex = /\{([\s\S]*)\}/;
+        var self = this;
+
+        if (el.nodeType === 3) {
+          var m = scopeRegex.exec(el.textContent);
+          if (m) {
+            (function () {
+              var ename = m[1];
+              self.on(ename, function (e) {
+                el.textContent = self[ename];
+              });
+              el.textContent = self[ename];
+            })();
+          }
+        } else {
           _each(el.attributes, function (val, key) {
             var m = scopeRegex.exec(val.textContent);
             if (m) {
@@ -243,14 +262,31 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
               $(el).removeAttr(val.nodeName);
             }
           });
+        }
+
+        this.template.find('*[data-list]').each(function () {
+          var $list = $(this);
+          var listName = $list.data('list');
+          var list = self[listName];
+          var $itemEl = $($(this).find('*')[0]);
+          $itemEl.remove();
+
+          list.each(function () {
+            $itemEl.clone().appendTo($list);
+          });
         });
 
-        this.render();
+        $(el).contents().each(function (i, el) {
+          _this3.scanElm(el);
+        });
+      }
+    }, {
+      key: 'scan',
+      value: function scan() {
+        var _this4 = this;
 
-        _each(attrs, function (attr) {
-          _this3.on(attr, function () {
-            _this3.sync(attr);
-          });
+        this.template.each(function (i, el) {
+          _this4.scanElm(el);
         });
       }
     }, {
@@ -260,45 +296,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         me.nextTick(function () {
           me.onBeforeRender.call(self);
           $(self.el).html(self.template);
-          self.find('*[data-text]').each(function () {
-            var key = $(this).data('text');
-            $(this).text(self[key]);
-          });
-
-          self.find('*[data-list]').each(function () {
-            var $list = $(this);
-            var listName = $list.data('list');
-            var list = self[listName];
-            var $itemEl = $($(this).find('*')[0]);
-            $itemEl.remove();
-
-            list.each(function () {
-              $itemEl.clone().appendTo($list);
-            });
-          });
 
           // FIXME: to addEventListener
           self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self);
 
           me.onAfterRender.call(self);
         });
-      }
-    }, {
-      key: 'sync',
-      value: function sync(attr) {
-        var self = this;
-        var value = self.prop(attr);
-        var $bind = this.find('*[data-text=' + attr + ']');
-        if ($bind.size() === 0) return this.render();
-
-        $bind.each(function () {
-          $(this).text(value);
-        });
-      }
-    }, {
-      key: 'update',
-      value: function update(attr) {
-        return this.sync(attr);
       }
     }, {
       key: 'find',
@@ -310,7 +313,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       key: 'prop',
       value: function prop(key) {
         var p = this[key];
-        if (_.isFunction(p)) return p();
+        if ($.isFunction(p)) return p();
         return p;
       }
     }]);
@@ -507,7 +510,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
         this.scripts = scripts;
 
-        if (_.isString(templates)) {
+        if ($.type(templates) === 'string') {
           this.templates = templates;
           this.name = name;
         } else {

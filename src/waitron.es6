@@ -8,7 +8,7 @@
   }
   /* eslint-enable no-undef */
 }))(typeof window !== 'undefined' ? window : this, (global) => {
-  /*global $ _ */
+  /*global $ */
 
   // utils ////////////////////////////////////////////////
   function log () {
@@ -156,20 +156,36 @@
     }
 
     bootstrap () {
-      const self = this
       if (typeof this.scripts === 'function') {
         this.scripts(this.options, this)
       } else {
         evalInContext(this.scripts, this)
       }
 
-      const attrs = listenate(this)
-      const scopeRegex = /\{([\s\S]*)\}/
+      listenate(this)
 
       $(this.el).attr('data-id', this.id)
       this.template = $(this.templates)
       console.log(this.templates)
-      this.template.each(function (i, el) {
+
+      this.scan()
+      this.render()
+    }
+
+    scanElm (el) {
+      const scopeRegex = /\{([\s\S]*)\}/
+      const self = this
+
+      if (el.nodeType === 3) {
+        const m = scopeRegex.exec(el.textContent)
+        if (m) {
+          const ename = m[1]
+          self.on(ename, (e) => {
+            el.textContent = self[ename]
+          })
+          el.textContent = self[ename]
+        }
+      } else {
         each(el.attributes, (val, key) => {
           const m = scopeRegex.exec(val.textContent)
           if (m) {
@@ -179,12 +195,28 @@
             $(el).removeAttr(val.nodeName)
           }
         })
+      }
+
+      this.template.find('*[data-list]').each(function () {
+        const $list = $(this)
+        const listName = $list.data('list')
+        const list = self[listName]
+        const $itemEl = $($(this).find('*')[0])
+        $itemEl.remove()
+
+        list.each(() => {
+          $itemEl.clone().appendTo($list)
+        })
       })
 
-      this.render()
+      $(el).contents().each((i, el) => {
+        this.scanElm(el)
+      })
+    }
 
-      each(attrs, attr => {
-        this.on(attr, () => { this.sync(attr) })
+    scan () {
+      this.template.each((i, el) => {
+        this.scanElm(el)
       })
     }
 
@@ -193,43 +225,12 @@
       me.nextTick(() => {
         me.onBeforeRender.call(self)
         $(self.el).html(self.template)
-        self.find('*[data-text]').each(function () {
-          const key = $(this).data('text')
-          $(this).text(self[key])
-        })
-
-        self.find('*[data-list]').each(function () {
-          const $list = $(this)
-          const listName = $list.data('list')
-          const list = self[listName]
-          const $itemEl = $($(this).find('*')[0])
-          $itemEl.remove()
-
-          list.each(() => {
-            $itemEl.clone().appendTo($list)
-          })
-        })
 
         // FIXME: to addEventListener
         self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self)
 
         me.onAfterRender.call(self)
       })
-    }
-
-    sync (attr) {
-      const self = this
-      const value = self.prop(attr)
-      const $bind = this.find(`*[data-text=${attr}]`)
-      if ($bind.size() === 0) return this.render()
-
-      $bind.each(function () {
-        $(this).text(value)
-      })
-    }
-
-    update (attr) {
-      return this.sync(attr)
     }
 
     find () {
@@ -239,7 +240,7 @@
 
     prop (key) {
       const p = this[key]
-      if (_.isFunction(p)) return p()
+      if ($.isFunction(p)) return p()
       return p
     }
   }
@@ -406,7 +407,7 @@
       constructor (scripts, templates, name) {
         this.scripts = scripts
 
-        if (_.isString(templates)) {
+        if ($.type(templates) === 'string') {
           this.templates = templates
           this.name = name
         } else {
