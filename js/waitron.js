@@ -211,6 +211,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       this.scripts = params.scripts;
       this.options = params.options;
       this.observer = new Observer();
+      this.children = new Collection();
 
       identify(this);
     }
@@ -226,8 +227,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
         listenate(this);
 
-        $(this.el).attr('data-id', this.id);
         this.template = $(this.templates);
+        this.doSetId();
         console.log(this.templates);
 
         this.scan();
@@ -240,43 +241,66 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
         var scopeRegex = /\{([\s\S]*)\}/;
         var self = this;
+        var $el = $(el);
 
-        if (el.nodeType === 3) {
-          var m = scopeRegex.exec(el.textContent);
-          if (m) {
-            (function () {
-              var ename = m[1];
-              self.on(ename, function (e) {
-                el.textContent = self[ename];
-              });
-              el.textContent = self[ename];
-            })();
-          }
-        } else {
-          _each(el.attributes, function (val, key) {
-            var m = scopeRegex.exec(val.textContent);
-            if (m) {
-              addEventListener(self, val.nodeName.substr(2), function (e) {
-                self[m[1]](e);
-              }, el);
-              $(el).removeAttr(val.nodeName);
-            }
-          });
+        var text = $el.text();
+        var m = scopeRegex.exec(text);
+        if (m) {
+          (function () {
+            var ename = m[1];
+            self.on(ename, function (e) {
+              $el.text(self[ename]);
+            });
+            $el.text(self[ename]);
+          })();
         }
 
-        this.template.find('*[data-list]').each(function () {
-          var $list = $(this);
-          var listName = $list.data('list');
-          var list = self[listName];
-          var $itemEl = $($(this).find('*')[0]);
-          $itemEl.remove();
+        _each(el.attributes, function (val, key) {
+          var name = val.nodeName;
+          var m = scopeRegex.exec(val.textContent);
+          if (m) {
+            var _ret2 = function () {
+              var key = m[1];
+              if (name.substr(0, 2) === 'on') {
+                addEventListener(_this3, name.substr(2), function (e) {
+                  _this3[key](e);
+                }, el);
+                $(el).removeAttr(name);
+              } else if (name === 'data-list') {
+                var _ret3 = function () {
+                  var list = _this3[key];
+                  var $itemEl = $($el.children());
+                  $itemEl.remove();
 
-          list.each(function () {
-            $itemEl.clone().appendTo($list);
-          });
+                  list.each(function (item) {
+                    var scope = new FilledScope({
+                      el: el,
+                      templates: $itemEl.clone(),
+                      scripts: function scripts() {
+                        scope.$this = item;
+                      },
+                      options: {}
+                    });
+                    _this3.children.push(scope);
+                    scope.bootstrap();
+                  });
+                  $el.removeAttr('data-list');
+                  return {
+                    v: {
+                      v: void 0
+                    }
+                  };
+                }();
+
+                if ((typeof _ret3 === 'undefined' ? 'undefined' : _typeof(_ret3)) === "object") return _ret3.v;
+              }
+            }();
+
+            if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
+          }
         });
 
-        $(el).contents().each(function (i, el) {
+        $(el).children().each(function (i, el) {
           _this3.scanElm(el);
         });
       }
@@ -292,11 +316,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'render',
       value: function render() {
+        var _this5 = this;
+
         var self = this;
         me.nextTick(function () {
           me.onBeforeRender.call(self);
-          $(self.el).html(self.template);
-
+          _this5.doRender();
           // FIXME: to addEventListener
           self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self);
 
@@ -322,6 +347,59 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }();
 
   delegate(Scope.prototype, ['on', 'trigger'], 'observer');
+
+  // el is top of element
+
+  var FilledScope = function (_Scope) {
+    _inherits(FilledScope, _Scope);
+
+    function FilledScope() {
+      _classCallCheck(this, FilledScope);
+
+      return _possibleConstructorReturn(this, Object.getPrototypeOf(FilledScope).apply(this, arguments));
+    }
+
+    _createClass(FilledScope, [{
+      key: 'doRender',
+      value: function doRender() {
+        $(this.el).append(this.template);
+      }
+    }, {
+      key: 'doSetId',
+      value: function doSetId() {
+        $(this.template).attr('data-id', this.id);
+      }
+    }]);
+
+    return FilledScope;
+  }(Scope);
+
+  // el is parent of elements
+
+
+  var PartScope = function (_Scope2) {
+    _inherits(PartScope, _Scope2);
+
+    function PartScope() {
+      _classCallCheck(this, PartScope);
+
+      return _possibleConstructorReturn(this, Object.getPrototypeOf(PartScope).apply(this, arguments));
+    }
+
+    _createClass(PartScope, [{
+      key: 'doRender',
+      value: function doRender() {
+        $(this.el).html(this.template);
+      }
+    }, {
+      key: 'doSetId',
+      value: function doSetId() {
+        $(this.el).attr('data-id', this.id);
+      }
+    }]);
+
+    return PartScope;
+  }(Scope);
 
   me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop', 'trigger', 'bootstrap', 'observer'];
 
@@ -489,7 +567,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           var options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
           var el = arguments.length <= 1 || arguments[1] === undefined ? document.createElement('div') : arguments[1];
 
-          var scope = new Scope({
+          var scope = new PartScope({
             el: el,
             templates: this.componentType.templates,
             scripts: this.componentType.scripts,

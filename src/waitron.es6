@@ -151,6 +151,7 @@
       this.scripts = params.scripts
       this.options = params.options
       this.observer = new Observer()
+      this.children = new Collection()
 
       identify(this)
     }
@@ -164,8 +165,8 @@
 
       listenate(this)
 
-      $(this.el).attr('data-id', this.id)
       this.template = $(this.templates)
+      this.doSetId()
       console.log(this.templates)
 
       this.scan()
@@ -175,41 +176,50 @@
     scanElm (el) {
       const scopeRegex = /\{([\s\S]*)\}/
       const self = this
+      const $el = $(el)
 
-      if (el.nodeType === 3) {
-        const m = scopeRegex.exec(el.textContent)
-        if (m) {
-          const ename = m[1]
-          self.on(ename, (e) => {
-            el.textContent = self[ename]
-          })
-          el.textContent = self[ename]
-        }
-      } else {
-        each(el.attributes, (val, key) => {
-          const m = scopeRegex.exec(val.textContent)
-          if (m) {
-            addEventListener(self, val.nodeName.substr(2), (e) => {
-              self[m[1]](e)
-            }, el)
-            $(el).removeAttr(val.nodeName)
-          }
+      const text = $el.text()
+      const m = scopeRegex.exec(text)
+      if (m) {
+        const ename = m[1]
+        self.on(ename, (e) => {
+          $el.text(self[ename])
         })
+        $el.text(self[ename])
       }
 
-      this.template.find('*[data-list]').each(function () {
-        const $list = $(this)
-        const listName = $list.data('list')
-        const list = self[listName]
-        const $itemEl = $($(this).find('*')[0])
-        $itemEl.remove()
+      each(el.attributes, (val, key) => {
+        const name = val.nodeName
+        const m = scopeRegex.exec(val.textContent)
+        if (m) {
+          const key = m[1]
+          if (name.substr(0, 2) === 'on') {
+            addEventListener(this, name.substr(2), (e) => {
+              this[key](e)
+            }, el)
+            $(el).removeAttr(name)
+          } else if (name === 'data-list') {
+            const list = this[key]
+            const $itemEl = $($el.children())
+            $itemEl.remove()
 
-        list.each(() => {
-          $itemEl.clone().appendTo($list)
-        })
+            list.each((item) => {
+              const scope = new FilledScope({
+                el: el,
+                templates: $itemEl.clone(),
+                scripts: function () { scope.$this = item },
+                options: {}
+              })
+              this.children.push(scope)
+              scope.bootstrap()
+            })
+            $el.removeAttr('data-list')
+            return
+          }
+        }
       })
 
-      $(el).contents().each((i, el) => {
+      $(el).children().each((i, el) => {
         this.scanElm(el)
       })
     }
@@ -224,8 +234,7 @@
       const self = this
       me.nextTick(() => {
         me.onBeforeRender.call(self)
-        $(self.el).html(self.template)
-
+        this.doRender()
         // FIXME: to addEventListener
         self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self)
 
@@ -246,6 +255,28 @@
   }
 
   delegate(Scope.prototype, ['on', 'trigger'], 'observer')
+
+  // el is top of element
+  class FilledScope extends Scope {
+    doRender () {
+      $(this.el).append(this.template)
+    }
+
+    doSetId () {
+      $(this.template).attr('data-id', this.id)
+    }
+  }
+
+  // el is parent of elements
+  class PartScope extends Scope {
+    doRender () {
+      $(this.el).html(this.template)
+    }
+
+    doSetId () {
+      $(this.el).attr('data-id', this.id)
+    }
+  }
 
   me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop', 'trigger', 'bootstrap', 'observer']
 
@@ -391,7 +422,7 @@
       constructor (componentType) { this.componentType = componentType }
 
       init (options = {}, el = document.createElement('div')) {
-        const scope = new Scope({
+        const scope = new PartScope({
           el: el,
           templates: this.componentType.templates,
           scripts: this.componentType.scripts,
