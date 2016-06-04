@@ -459,6 +459,12 @@
         $(el).after(component.scope.el)
         return component
       }
+
+      mixTo (el, params) {
+        const component = this.create()
+        component.init(params, el)
+        return component
+      }
     }
 
     ComponentType.list = {}
@@ -487,7 +493,7 @@
     })
   }
 
-  me.mount = (el, handler) => new ComponentType(handler, el)
+  me.import = (el, handler) => new ComponentType(handler, el)
 
   me.find = name => ComponentType.find(name)
 

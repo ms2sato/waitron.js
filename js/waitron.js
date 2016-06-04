@@ -612,6 +612,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           $(el).after(component.scope.el);
           return component;
         }
+      }, {
+        key: 'mixTo',
+        value: function mixTo(el, params) {
+          var component = this.create();
+          component.init(params, el);
+          return component;
+        }
       }]);
 
       return ComponentType;
@@ -645,7 +652,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     });
   };
 
-  me.mount = function (el, handler) {
+  me.import = function (el, handler) {
     return new ComponentType(handler, el);
   };
 

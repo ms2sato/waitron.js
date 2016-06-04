@@ -54,7 +54,7 @@
       </form>
     </template>
     <script>
-      w.mount(titleBind, (options, scope) => {
+      w.import(titleBind, (options, scope) => {
         scope.title = "テスト"
         scope.subtitle = new Date
 
@@ -69,18 +69,18 @@
     </script>
 
     <script>
-      w.find('titleBind').createAfter($('#testImpl'))
+      w.find('titleBind').mixTo(testImpl)
     </script>
 
     <script>
-      var type = w.mount(strList, function(options){
+      var type = w.import(strList, function(options){
         this.items = new w.Collection([1,2,3])
         var self = this
         this.onRendered = function () {
           self.items.insert(2, 4)
         }
       });
-      var cmp = type.createAfter($('#strListImpl'))
+      var cmp = type.mixTo(strListImpl)
     </script>
 
     <template id="test">
@@ -89,7 +89,7 @@
 
 
     <script>
-      var type = w.mount(titleList, function(options){
+      var type = w.import(titleList, function(options){
         this.items = []
         var type = w.find('titleBind')
         var titleBind = type.create()
@@ -99,7 +99,7 @@
         this.onRendered = function () {
         }
       });
-      var cmp = type.createAfter($('#titleListImpl'))
+      var cmp = type.mixTo(titleListImpl)
     </script>
 
   </body>
