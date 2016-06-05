@@ -55,8 +55,8 @@
     </template>
     <script>
       w.import(titleBind, (options, scope) => {
-        scope.title = "テスト"
-        scope.subtitle = new Date
+        scope.title = options.title || "テスト"
+        scope.subtitle = options.subtitle || new Date
 
         scope.h1Clicked = (e) => {
           scope.title = "ああああ"
@@ -90,7 +90,10 @@
 
     <script>
       var type = w.import(titleList, function(options){
-        this.items = new w.Collection([1, 2])
+        this.items = new w.Collection([
+          {title: 'オプション'},
+          {subtitle: 'sub'}
+        ])
 
         this.onRendered = function () {
         }
