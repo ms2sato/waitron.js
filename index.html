@@ -33,8 +33,8 @@
     <div id="strListImpl"></div>
 
     <template id="titleList">
-      <ul data-components="items">
-        <li data-component="titleBind"></li>
+      <ul data-list="{items}">
+        <li data-type="titleBind"></li>
       </ul>
     </template>
     <div id="titleListImpl"></div>
@@ -90,11 +90,7 @@
 
     <script>
       var type = w.import(titleList, function(options){
-        this.items = []
-        var type = w.find('titleBind')
-        var titleBind = type.create()
-        titleBind.init(options)
-        titleBind.scope.el
+        this.items = new w.Collection([1, 2])
 
         this.onRendered = function () {
         }

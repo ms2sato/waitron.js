@@ -272,18 +272,27 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
                   var $itemEl = $($el.children());
                   $itemEl.remove();
 
-                  list.each(function (item) {
-                    var scope = new FilledScope({
-                      el: el,
-                      templates: $itemEl.clone(),
-                      scripts: function scripts() {
-                        scope.$this = item;
-                      },
-                      options: {}
+                  var typeName = $itemEl.attr('data-type');
+                  if (typeName) {
+                    $itemEl.removeAttr('data-type');
+                    list.each(function (item) {
+                      var scope = ComponentType.find(typeName).mixTo($($itemEl.clone()).appendTo($el), item);
+                      _this3.children.push(scope);
                     });
-                    _this3.children.push(scope);
-                    scope.bootstrap();
-                  });
+                  } else {
+                    list.each(function (item) {
+                      var scope = new FilledScope({
+                        el: el,
+                        templates: $itemEl.clone(),
+                        scripts: function scripts() {
+                          scope.$this = item;
+                        },
+                        options: {}
+                      });
+                      _this3.children.push(scope);
+                      scope.bootstrap();
+                    });
+                  }
                   $el.removeAttr('data-list');
                   return {
                     v: {
@@ -348,7 +357,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
   delegate(Scope.prototype, ['on', 'trigger'], 'observer');
 
-  // el is top of element
+  // el is parent of element
 
   var FilledScope = function (_Scope) {
     _inherits(FilledScope, _Scope);
@@ -374,7 +383,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return FilledScope;
   }(Scope);
 
-  // el is parent of elements
+  // el is top of elements
 
 
   var PartScope = function (_Scope2) {
@@ -421,10 +430,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       var key = $el.data('value');
       addEventListener(self, 'change', function () {
         self[key] = $el.val();
-      });
+      }, this);
       addEventListener(self, 'keyup', function () {
         self[key] = $el.val();
-      });
+      }, this);
     });
   };
 
@@ -554,90 +563,78 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }
 
   var ComponentType = function () {
-    var Component = function () {
-      function Component(componentType) {
-        _classCallCheck(this, Component);
+    _createClass(ComponentType, null, [{
+      key: 'createFromScript',
+      value: function createFromScript(shadows) {
+        var scripts = extractRegex(scriptRegex, shadows);
+        var templates = extractRegex(templateRegex, shadows);
+        return new ComponentType(scripts, templates);
+      }
+    }, {
+      key: 'find',
+      value: function find(name) {
+        return ComponentType.list[name];
+      }
+    }]);
 
-        this.componentType = componentType;
+    function ComponentType(scripts, templates, name) {
+      _classCallCheck(this, ComponentType);
+
+      this.scripts = scripts;
+
+      if ($.type(templates) === 'string') {
+        this.templates = templates;
+        this.name = name;
+      } else {
+        this.templates = $(templates).html();
+        this.name = name || $(templates).attr('id');
       }
 
-      _createClass(Component, [{
-        key: 'init',
-        value: function init() {
-          var options = arguments.length <= 0 || arguments[0] === undefined ? {} : arguments[0];
-          var el = arguments.length <= 1 || arguments[1] === undefined ? document.createElement('div') : arguments[1];
+      ComponentType.list[this.name] = this;
+    }
 
-          var scope = new PartScope({
-            el: el,
-            templates: this.componentType.templates,
-            scripts: this.componentType.scripts,
-            options: options
-          });
-          this.scope = scope;
-          scope.bootstrap();
-          return this;
-        }
-      }]);
+    _createClass(ComponentType, [{
+      key: 'mixTo',
+      value: function mixTo() {
+        var el = arguments.length <= 0 || arguments[0] === undefined ? document.createElement('div') : arguments[0];
+        var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
-      return Component;
-    }();
-
-    var ComponentType = function () {
-      function ComponentType(scripts, templates, name) {
-        _classCallCheck(this, ComponentType);
-
-        this.scripts = scripts;
-
-        if ($.type(templates) === 'string') {
-          this.templates = templates;
-          this.name = name;
-        } else {
-          this.templates = $(templates).html();
-          this.name = name || $(templates).attr('id');
-        }
-
-        ComponentType.list[this.name] = this;
+        var scope = new PartScope({
+          el: el,
+          templates: this.templates,
+          scripts: this.scripts,
+          options: options
+        });
+        scope.bootstrap();
+        return scope;
       }
+    }, {
+      key: 'createInto',
+      value: function createInto(el) {
+        var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
-      _createClass(ComponentType, [{
-        key: 'create',
-        value: function create() {
-          return new Component(this);
-        }
-      }, {
-        key: 'createAfter',
-        value: function createAfter(el, params) {
-          var component = this.create();
-          component.init(params);
-          $(el).after(component.scope.el);
-          return component;
-        }
-      }, {
-        key: 'mixTo',
-        value: function mixTo(el, params) {
-          var component = this.create();
-          component.init(params, el);
-          return component;
-        }
-      }]);
-
-      return ComponentType;
-    }();
-
-    ComponentType.list = {};
-
-    ComponentType.createFromScript = function (shadows) {
-      var scripts = extractRegex(scriptRegex, shadows);
-      var templates = extractRegex(templateRegex, shadows);
-      return new ComponentType(scripts, templates);
-    };
-
-    ComponentType.find = function (name) {
-      return ComponentType.list[name];
-    };
+        var scope = new FilledScope({
+          el: el,
+          templates: this.templates,
+          scripts: this.scripts,
+          options: options
+        });
+        scope.bootstrap();
+        return scope;
+      }
+    }, {
+      key: 'createAfter',
+      value: function createAfter(el, params) {
+        var scope = this.mixTo(document.createElement('div'), params);
+        $(el).after(scope.el);
+        return scope;
+      }
+    }]);
 
     return ComponentType;
   }();
+
+  ComponentType.list = {};
 
   me.initFromScript = function (scriptEl) {
     var shadows = $(scriptEl).text();

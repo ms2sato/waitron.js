@@ -203,16 +203,27 @@
             const $itemEl = $($el.children())
             $itemEl.remove()
 
-            list.each((item) => {
-              const scope = new FilledScope({
-                el: el,
-                templates: $itemEl.clone(),
-                scripts: function () { scope.$this = item },
-                options: {}
+            const typeName = $itemEl.attr('data-type')
+            if (typeName) {
+              $itemEl.removeAttr('data-type')
+              list.each((item) => {
+                const scope = ComponentType.find(typeName).mixTo(
+                  $($itemEl.clone()
+                ).appendTo($el), item)
+                this.children.push(scope)
               })
-              this.children.push(scope)
-              scope.bootstrap()
-            })
+            } else {
+              list.each((item) => {
+                const scope = new FilledScope({
+                  el: el,
+                  templates: $itemEl.clone(),
+                  scripts: function () { scope.$this = item },
+                  options: {}
+                })
+                this.children.push(scope)
+                scope.bootstrap()
+              })
+            }
             $el.removeAttr('data-list')
             return
           }
@@ -256,7 +267,7 @@
 
   delegate(Scope.prototype, ['on', 'trigger'], 'observer')
 
-  // el is top of element
+  // el is parent of element
   class FilledScope extends Scope {
     doRender () {
       $(this.el).append(this.template)
@@ -267,7 +278,7 @@
     }
   }
 
-  // el is parent of elements
+  // el is top of elements
   class PartScope extends Scope {
     doRender () {
       $(this.el).html(this.template)
@@ -298,10 +309,10 @@
       const key = $el.data('value')
       addEventListener(self, 'change', () => {
         self[key] = $el.val()
-      })
+      }, this)
       addEventListener(self, 'keyup', () => {
         self[key] = $el.val()
-      })
+      }, this)
     })
   }
 
@@ -417,68 +428,59 @@
     return m[1] // TODO:join?
   }
 
-  const ComponentType = ((() => {
-    class Component {
-      constructor (componentType) { this.componentType = componentType }
-
-      init (options = {}, el = document.createElement('div')) {
-        const scope = new PartScope({
-          el: el,
-          templates: this.componentType.templates,
-          scripts: this.componentType.scripts,
-          options: options
-        })
-        this.scope = scope
-        scope.bootstrap()
-        return this
-      }
-    }
-
-    class ComponentType {
-      constructor (scripts, templates, name) {
-        this.scripts = scripts
-
-        if ($.type(templates) === 'string') {
-          this.templates = templates
-          this.name = name
-        } else {
-          this.templates = $(templates).html()
-          this.name = name || $(templates).attr('id')
-        }
-
-        ComponentType.list[this.name] = this
-      }
-
-      create () {
-        return new Component(this)
-      }
-
-      createAfter (el, params) {
-        const component = this.create()
-        component.init(params)
-        $(el).after(component.scope.el)
-        return component
-      }
-
-      mixTo (el, params) {
-        const component = this.create()
-        component.init(params, el)
-        return component
-      }
-    }
-
-    ComponentType.list = {}
-
-    ComponentType.createFromScript = shadows => {
+  class ComponentType {
+    static createFromScript (shadows) {
       const scripts = extractRegex(scriptRegex, shadows)
       const templates = extractRegex(templateRegex, shadows)
       return new ComponentType(scripts, templates)
     }
 
-    ComponentType.find = name => ComponentType.list[name]
+    static find (name) { return ComponentType.list[name] }
 
-    return ComponentType
-  }))()
+    constructor (scripts, templates, name) {
+      this.scripts = scripts
+
+      if ($.type(templates) === 'string') {
+        this.templates = templates
+        this.name = name
+      } else {
+        this.templates = $(templates).html()
+        this.name = name || $(templates).attr('id')
+      }
+
+      ComponentType.list[this.name] = this
+    }
+
+    mixTo (el = document.createElement('div'), options = {}) {
+      const scope = new PartScope({
+        el: el,
+        templates: this.templates,
+        scripts: this.scripts,
+        options: options
+      })
+      scope.bootstrap()
+      return scope
+    }
+
+    createInto (el, options = {}) {
+      const scope = new FilledScope({
+        el: el,
+        templates: this.templates,
+        scripts: this.scripts,
+        options: options
+      })
+      scope.bootstrap()
+      return scope
+    }
+
+    createAfter (el, params) {
+      const scope = this.mixTo(document.createElement('div'), params)
+      $(el).after(scope.el)
+      return scope
+    }
+  }
+
+  ComponentType.list = {}
 
   me.initFromScript = scriptEl => {
     const shadows = $(scriptEl).text()
