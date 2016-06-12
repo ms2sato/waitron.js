@@ -44,10 +44,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   // me ////////////////////////////////////////////////
   var me = function waitron() {};
 
-  function delegate(prototype, name, to) {
+  function delegate(prototype, to, name) {
     if (Array.isArray(name)) {
       return _each(name, function (n) {
-        delegate(prototype, n, to);
+        delegate(prototype, to, n);
       });
     }
 
@@ -124,7 +124,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       value: function push(models) {}
     }, {
       key: 'at',
-      value: function at(index) {}
+      value: function at(index) {
+        return this.models[index];
+      }
     }, {
       key: 'shift',
       value: function shift() {}
@@ -202,6 +204,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return ret;
   }
 
+  var scopeRegex = /\{([\s\S]*)\}/;
+
   var Scope = function () {
     function Scope(params) {
       _classCallCheck(this, Scope);
@@ -235,102 +239,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         this.render();
       }
     }, {
-      key: 'scanElm',
-      value: function scanElm(el) {
-        var _this3 = this;
-
-        var scopeRegex = /\{([\s\S]*)\}/;
-        var self = this;
-        var $el = $(el);
-
-        var text = $el.text();
-        var m = scopeRegex.exec(text);
-        if (m) {
-          (function () {
-            var ename = m[1];
-            self.on(ename, function (e) {
-              $el.text(self[ename]);
-            });
-            $el.text(self[ename]);
-          })();
-        }
-
-        _each(el.attributes, function (val, key) {
-          var name = val.nodeName;
-          var m = scopeRegex.exec(val.textContent);
-          if (m) {
-            var _ret2 = function () {
-              var key = m[1];
-              if (name.substr(0, 2) === 'on') {
-                addEventListener(_this3, name.substr(2), function (e) {
-                  _this3[key](e);
-                }, el);
-                $(el).removeAttr(name);
-              } else if (name === 'data-list') {
-                var _ret3 = function () {
-                  var list = _this3[key];
-                  var $itemEl = $($el.children());
-                  $itemEl.remove();
-
-                  var typeName = $itemEl.attr('data-type');
-                  if (typeName) {
-                    $itemEl.removeAttr('data-type');
-                    list.each(function (item) {
-                      var scope = ComponentType.find(typeName).mixTo($($itemEl.clone()).appendTo($el), item);
-                      _this3.children.push(scope);
-                    });
-                  } else {
-                    list.each(function (item) {
-                      var scope = new FilledScope({
-                        el: el,
-                        templates: $itemEl.clone(),
-                        scripts: function scripts() {
-                          scope.$this = item;
-                        },
-                        options: {}
-                      });
-                      _this3.children.push(scope);
-                      scope.bootstrap();
-                    });
-                  }
-                  $el.removeAttr('data-list');
-                  return {
-                    v: {
-                      v: void 0
-                    }
-                  };
-                }();
-
-                if ((typeof _ret3 === 'undefined' ? 'undefined' : _typeof(_ret3)) === "object") return _ret3.v;
-              }
-            }();
-
-            if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
-          }
-        });
-
-        $(el).children().each(function (i, el) {
-          _this3.scanElm(el);
-        });
-      }
-    }, {
-      key: 'scan',
-      value: function scan() {
-        var _this4 = this;
-
-        this.template.each(function (i, el) {
-          _this4.scanElm(el);
-        });
-      }
-    }, {
       key: 'render',
       value: function render() {
-        var _this5 = this;
+        var _this3 = this;
 
         var self = this;
         me.nextTick(function () {
           me.onBeforeRender.call(self);
-          _this5.doRender();
+          _this3.doRender();
           // FIXME: to addEventListener
           self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self);
 
@@ -350,12 +266,124 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         if ($.isFunction(p)) return p();
         return p;
       }
+
+      // private
+
+    }, {
+      key: 'scanElm',
+      value: function scanElm(el) {
+        var _this4 = this;
+
+        var self = this;
+        var $el = $(el);
+
+        var text = $el.text();
+        var m = scopeRegex.exec(text);
+        if (m) {
+          (function () {
+            var ename = m[1];
+            self.on(ename, function (e) {
+              $el.text(self[ename]);
+            });
+            $el.text(self[ename]);
+          })();
+        }
+
+        _each(el.attributes, function (val, key) {
+          _this4.scanAttr(el, key, val);
+        });
+
+        $(el).children().each(function (i, el) {
+          _this4.scanElm(el);
+        });
+      }
+    }, {
+      key: 'scanAttr',
+      value: function scanAttr(el, key, val) {
+        var _this5 = this;
+
+        var $el = $(el);
+
+        var name = val.nodeName;
+        var m = scopeRegex.exec(val.textContent);
+        if (m) {
+          var _ret2 = function () {
+            var key = m[1];
+            if (name.substr(0, 2) === 'on') {
+              addEventListener(_this5, name.substr(2), function (e) {
+                _this5[key](e);
+              }, el);
+              $(el).removeAttr(name);
+            } else if (name === 'data-list') {
+              var _ret3 = function () {
+                var list = _this5[key];
+                var $itemEl = $($el.children());
+                $itemEl.remove();
+
+                var typeName = $itemEl.attr('data-type');
+                if (typeName) {
+                  $itemEl.removeAttr('data-type');
+                  list.each(function (item) {
+                    var scope = ComponentType.find(typeName).mixTo($($itemEl.clone()).appendTo($el), item);
+                    _this5.children.push(scope);
+                  });
+                } else {
+                  (function () {
+                    var creator = function creator(item) {
+                      var scope = new FilledScope({
+                        el: el,
+                        templates: $itemEl.clone(),
+                        scripts: function scripts() {
+                          scope.$this = item;
+                        },
+                        options: {}
+                      });
+                      return scope;
+                    };
+
+                    list.each(function (item) {
+                      var scope = creator(item);
+                      _this5.children.push(scope);
+                      scope.bootstrap();
+                    });
+
+                    list.on('inserted', function (index) {
+                      var scope = creator(list.at(index));
+                      _this5.children.insert(index, scope);
+                      scope.bootstrap();
+                    });
+                  })();
+                }
+                $el.removeAttr('data-list');
+                return {
+                  v: {
+                    v: void 0
+                  }
+                };
+              }();
+
+              if ((typeof _ret3 === 'undefined' ? 'undefined' : _typeof(_ret3)) === "object") return _ret3.v;
+            }
+          }();
+
+          if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
+        }
+      }
+    }, {
+      key: 'scan',
+      value: function scan() {
+        var _this6 = this;
+
+        this.template.each(function (i, el) {
+          _this6.scanElm(el);
+        });
+      }
     }]);
 
     return Scope;
   }();
 
-  delegate(Scope.prototype, ['on', 'trigger'], 'observer');
+  delegate(Scope.prototype, 'observer', ['on', 'trigger']);
 
   // el is parent of element
 
@@ -459,6 +487,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
   function onCollectionInserted(c, index, value) {
     log('onCollectionInserted', arguments);
+
+    me.tickContext.push(c.id + '@inserted', function () {
+      c.trigger('inserted', index);
+    });
   }
 
   // var c = new me.Collection([1, 2, 3])

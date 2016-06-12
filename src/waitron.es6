@@ -30,10 +30,10 @@
   // me ////////////////////////////////////////////////
   var me = function waitron () {}
 
-  function delegate (prototype, name, to) {
+  function delegate (prototype, to, name) {
     if (Array.isArray(name)) {
       return each(name, (n) => {
-        delegate(prototype, n, to)
+        delegate(prototype, to, n)
       })
     }
 
@@ -89,7 +89,7 @@
     }
 
     push (models) {}
-    at (index) {}
+    at (index) { return this.models[index] }
     shift () {}
     unshift () {}
     pop () {}
@@ -144,6 +144,8 @@
     return ret
   }
 
+  const scopeRegex = /\{([\s\S]*)\}/
+
   class Scope {
     constructor (params) {
       this.el = params.el
@@ -173,74 +175,6 @@
       this.render()
     }
 
-    scanElm (el) {
-      const scopeRegex = /\{([\s\S]*)\}/
-      const self = this
-      const $el = $(el)
-
-      const text = $el.text()
-      const m = scopeRegex.exec(text)
-      if (m) {
-        const ename = m[1]
-        self.on(ename, (e) => {
-          $el.text(self[ename])
-        })
-        $el.text(self[ename])
-      }
-
-      each(el.attributes, (val, key) => {
-        const name = val.nodeName
-        const m = scopeRegex.exec(val.textContent)
-        if (m) {
-          const key = m[1]
-          if (name.substr(0, 2) === 'on') {
-            addEventListener(this, name.substr(2), (e) => {
-              this[key](e)
-            }, el)
-            $(el).removeAttr(name)
-          } else if (name === 'data-list') {
-            const list = this[key]
-            const $itemEl = $($el.children())
-            $itemEl.remove()
-
-            const typeName = $itemEl.attr('data-type')
-            if (typeName) {
-              $itemEl.removeAttr('data-type')
-              list.each((item) => {
-                const scope = ComponentType.find(typeName).mixTo(
-                  $($itemEl.clone()
-                ).appendTo($el), item)
-                this.children.push(scope)
-              })
-            } else {
-              list.each((item) => {
-                const scope = new FilledScope({
-                  el: el,
-                  templates: $itemEl.clone(),
-                  scripts: function () { scope.$this = item },
-                  options: {}
-                })
-                this.children.push(scope)
-                scope.bootstrap()
-              })
-            }
-            $el.removeAttr('data-list')
-            return
-          }
-        }
-      })
-
-      $(el).children().each((i, el) => {
-        this.scanElm(el)
-      })
-    }
-
-    scan () {
-      this.template.each((i, el) => {
-        this.scanElm(el)
-      })
-    }
-
     render () {
       const self = this
       me.nextTick(() => {
@@ -263,9 +197,95 @@
       if ($.isFunction(p)) return p()
       return p
     }
+
+    // private
+
+    scanElm (el) {
+      const self = this
+      const $el = $(el)
+
+      const text = $el.text()
+      const m = scopeRegex.exec(text)
+      if (m) {
+        const ename = m[1]
+        self.on(ename, (e) => {
+          $el.text(self[ename])
+        })
+        $el.text(self[ename])
+      }
+
+      each(el.attributes, (val, key) => {
+        this.scanAttr(el, key, val)
+      })
+
+      $(el).children().each((i, el) => {
+        this.scanElm(el)
+      })
+    }
+
+    scanAttr (el, key, val) {
+      const $el = $(el)
+
+      const name = val.nodeName
+      const m = scopeRegex.exec(val.textContent)
+      if (m) {
+        const key = m[1]
+        if (name.substr(0, 2) === 'on') {
+          addEventListener(this, name.substr(2), (e) => {
+            this[key](e)
+          }, el)
+          $(el).removeAttr(name)
+        } else if (name === 'data-list') {
+          const list = this[key]
+          const $itemEl = $($el.children())
+          $itemEl.remove()
+
+          const typeName = $itemEl.attr('data-type')
+          if (typeName) {
+            $itemEl.removeAttr('data-type')
+            list.each((item) => {
+              const scope = ComponentType.find(typeName).mixTo(
+                $($itemEl.clone()
+              ).appendTo($el), item)
+              this.children.push(scope)
+            })
+          } else {
+            const creator = (item) => {
+              const scope = new FilledScope({
+                el: el,
+                templates: $itemEl.clone(),
+                scripts: function () { scope.$this = item },
+                options: {}
+              })
+              return scope
+            }
+
+            list.each((item) => {
+              const scope = creator(item)
+              this.children.push(scope)
+              scope.bootstrap()
+            })
+
+            list.on('inserted', (index) => {
+              const scope = creator(list.at(index))
+              this.children.insert(index, scope)
+              scope.bootstrap()
+            })
+          }
+          $el.removeAttr('data-list')
+          return
+        }
+      }
+    }
+
+    scan () {
+      this.template.each((i, el) => {
+        this.scanElm(el)
+      })
+    }
   }
 
-  delegate(Scope.prototype, ['on', 'trigger'], 'observer')
+  delegate(Scope.prototype, 'observer', ['on', 'trigger'])
 
   // el is parent of element
   class FilledScope extends Scope {
@@ -338,6 +358,10 @@
 
   function onCollectionInserted (c, index, value) {
     log('onCollectionInserted', arguments)
+
+    me.tickContext.push(`${c.id}@inserted`, () => {
+      c.trigger('inserted', index)
+    })
   }
 
   // var c = new me.Collection([1, 2, 3])
