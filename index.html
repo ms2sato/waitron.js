@@ -44,7 +44,7 @@
           scope.title = "ああああ"
         }
 
-        scope.on('title', () => {
+        scope.on('change:title', () => {
           scope.subtitle = scope.title + new Date
         })
       })

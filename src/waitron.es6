@@ -146,6 +146,7 @@
   }
 
   const scopeRegex = /\{([\s\S]*)\}/
+  function getChangeEventName (prop) { return `change:${prop}` }
 
   class Scope {
     constructor (params) {
@@ -209,11 +210,11 @@
       const text = $el.text()
       const m = scopeRegex.exec(text)
       if (m) {
-        const ename = m[1]
-        self.on(ename, (e) => {
-          $el.text(self[ename])
+        const prop = m[1]
+        self.on(getChangeEventName(prop), (e) => {
+          $el.text(self[prop])
         })
-        $el.text(self[ename])
+        $el.text(self[prop])
       }
 
       each(el.attributes, (val, key) => {
@@ -242,7 +243,7 @@
           self[key] = $el.val()
         }, this)
 
-        self.on(key, () => {
+        self.on(getChangeEventName(key), () => {
           $el.val(self[key])
         })
       })
@@ -388,7 +389,8 @@
     log('onAfterPropertyChange', arguments)
 
     me.tickContext.push(`${o.id}@${prop}`, () => {
-      o.trigger(prop)
+      log(`triggered ${getChangeEventName(prop)}`)
+      o.trigger(getChangeEventName(prop))
     })
   }
 

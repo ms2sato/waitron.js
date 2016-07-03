@@ -209,6 +209,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }
 
   var scopeRegex = /\{([\s\S]*)\}/;
+  function getChangeEventName(prop) {
+    return 'change:' + prop;
+  }
 
   var Scope = function () {
     function Scope(params) {
@@ -284,11 +287,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         var m = scopeRegex.exec(text);
         if (m) {
           (function () {
-            var ename = m[1];
-            self.on(ename, function (e) {
-              $el.text(self[ename]);
+            var prop = m[1];
+            self.on(getChangeEventName(prop), function (e) {
+              $el.text(self[prop]);
             });
-            $el.text(self[ename]);
+            $el.text(self[prop]);
           })();
         }
 
@@ -319,7 +322,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             self[key] = $el.val();
           }, this);
 
-          self.on(key, function () {
+          self.on(getChangeEventName(key), function () {
             $el.val(self[key]);
           });
         });
@@ -534,7 +537,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     log('onAfterPropertyChange', arguments);
 
     me.tickContext.push(o.id + '@' + prop, function () {
-      o.trigger(prop);
+      log('triggered ' + getChangeEventName(prop));
+      o.trigger(getChangeEventName(prop));
     });
   }
 
