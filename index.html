@@ -27,7 +27,7 @@
     <template id="strList">
       <h3>strList</h3>
       <ul data-list="{items}">
-        <li>{$this}</li>
+        <li><a href="#">{$this}</a></li>
       </ul>
     </template>
     <div id="strListImpl"></div>
@@ -92,8 +92,7 @@
       var type = w.import(titleList, function(options){
         this.items = new w.Collection([
           {title: 'オプション'},
-
-          {subtitle: 'sub'}
+          {title: 'タイトル2', subtitle: 'sub'}
         ])
 
         this.onRendered = function () {

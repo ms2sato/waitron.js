@@ -149,6 +149,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         onCollectionInserted(this, index, models);
       }
     }, {
+      key: 'move',
+      value: function move() {}
+    }, {
       key: 'remove',
       value: function remove(models) {}
     }, {
@@ -215,7 +218,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       this.scripts = params.scripts;
       this.options = params.options;
       this.observer = new Observer();
-      this.children = new Collection();
 
       identify(this);
     }
@@ -241,17 +243,15 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'render',
       value: function render() {
-        var _this3 = this;
-
         var self = this;
-        me.nextTick(function () {
-          me.onBeforeRender.call(self);
-          _this3.doRender();
-          // FIXME: to addEventListener
-          self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self);
+        // me.nextTick(() => {
+        me.onBeforeRender.call(self);
+        this.doRender();
+        // FIXME: to addEventListener
+        self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self);
 
-          me.onAfterRender.call(self);
-        });
+        me.onAfterRender.call(self);
+        // })
       }
     }, {
       key: 'find',
@@ -272,10 +272,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'scanElm',
       value: function scanElm(el) {
-        var _this4 = this;
+        var _this3 = this;
 
         var self = this;
         var $el = $(el);
+
+        this.scanValues($el);
 
         var text = $el.text();
         var m = scopeRegex.exec(text);
@@ -290,67 +292,90 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         _each(el.attributes, function (val, key) {
-          _this4.scanAttr(el, key, val);
+          _this3.scanAttr(el, key, val);
         });
 
         $(el).children().each(function (i, el) {
-          _this4.scanElm(el);
+          _this3.scanElm(el);
+        });
+      }
+    }, {
+      key: 'scanValues',
+      value: function scanValues($el) {
+        var self = this;
+        $el.find('input[data-value]').each(function () {
+          var $el = $(this);
+          var key = $el.data('value');
+          addEventListener(self, 'change', function () {
+            self[key] = $el.val();
+          }, this);
+          addEventListener(self, 'keyup', function () {
+            self[key] = $el.val();
+          }, this);
         });
       }
     }, {
       key: 'scanAttr',
       value: function scanAttr(el, key, val) {
-        var _this5 = this;
+        var _this4 = this;
 
         var $el = $(el);
-
         var name = val.nodeName;
         var m = scopeRegex.exec(val.textContent);
         if (m) {
           var _ret2 = function () {
             var key = m[1];
             if (name.substr(0, 2) === 'on') {
-              addEventListener(_this5, name.substr(2), function (e) {
-                _this5[key](e);
+              addEventListener(_this4, name.substr(2), function (e) {
+                _this4[key](e);
               }, el);
               $(el).removeAttr(name);
             } else if (name === 'data-list') {
               var _ret3 = function () {
-                var list = _this5[key];
+                var list = _this4[key];
                 var $itemEl = $($el.children());
                 $itemEl.remove();
 
                 var typeName = $itemEl.attr('data-type');
                 if (typeName) {
-                  $itemEl.removeAttr('data-type');
-                  list.each(function (item) {
-                    var scope = ComponentType.find(typeName).mixTo($($itemEl.clone()).appendTo($el), item);
-                    _this5.children.push(scope);
-                  });
+                  (function () {
+                    $itemEl.removeAttr('data-type');
+                    var component = ComponentType.find(typeName);
+                    list.each(function (item, index) {
+                      var templates = $itemEl.clone();
+                      templates.append($(component.templates).clone());
+                      var scope = new IndexedScope({
+                        el: el,
+                        templates: templates,
+                        scripts: component.scripts,
+                        index: index,
+                        options: item
+                      });
+                      scope.bootstrap();
+                    });
+                  })();
                 } else {
                   (function () {
-                    var creator = function creator(item) {
-                      var scope = new FilledScope({
+                    var creator = function creator(item, index) {
+                      var scope = new IndexedScope({
                         el: el,
                         templates: $itemEl.clone(),
                         scripts: function scripts() {
                           scope.$this = item;
                         },
+                        index: index,
                         options: {}
                       });
+                      scope.bootstrap();
                       return scope;
                     };
 
-                    list.each(function (item) {
-                      var scope = creator(item);
-                      _this5.children.push(scope);
-                      scope.bootstrap();
+                    list.each(function (item, index) {
+                      var scope = creator(item, index);
                     });
 
                     list.on('inserted', function (index) {
-                      var scope = creator(list.at(index));
-                      _this5.children.insert(index, scope);
-                      scope.bootstrap();
+                      var scope = creator(list.at(index), index);
                     });
                   })();
                 }
@@ -372,10 +397,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'scan',
       value: function scan() {
-        var _this6 = this;
+        var _this5 = this;
 
         this.template.each(function (i, el) {
-          _this6.scanElm(el);
+          _this5.scanElm(el);
         });
       }
     }]);
@@ -411,6 +436,36 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return FilledScope;
   }(Scope);
 
+  var IndexedScope = function (_FilledScope) {
+    _inherits(IndexedScope, _FilledScope);
+
+    function IndexedScope(params) {
+      _classCallCheck(this, IndexedScope);
+
+      var _this7 = _possibleConstructorReturn(this, Object.getPrototypeOf(IndexedScope).call(this, params));
+
+      _this7.index = params.index;
+      return _this7;
+    }
+
+    _createClass(IndexedScope, [{
+      key: 'doRender',
+      value: function doRender() {
+        if (this.index === 0) {
+          return $(this.el).append(this.template);
+        }
+        var $target = $(this.el).children('*:nth-child(' + this.index + ')');
+        if ($target.size() === 0) {
+          throw new Error('*:nth-child(' + this.index + ') not found');
+        }
+
+        return $target.after(this.template);
+      }
+    }]);
+
+    return IndexedScope;
+  }(FilledScope);
+
   // el is top of elements
 
 
@@ -438,7 +493,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return PartScope;
   }(Scope);
 
-  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop', 'trigger', 'bootstrap', 'observer'];
+  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop', 'trigger', 'bootstrap', 'observer', 'index'];
 
   if (global.setImmediate) {
     me.nextTick = function (func) {
@@ -446,24 +501,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     };
   } else {
     me.nextTick = function (func) {
-      global.setTimeout(decorateEventable(null, 'tick', func), 0);
+      global.setTimeout(decorateEventable(null, 'tick', func), 100);
     };
   }
 
   me.onBeforeRender = function () {};
-  me.onAfterRender = function () {
-    var self = this;
-    $(self.el).find('input[data-value]').each(function () {
-      var $el = $(this);
-      var key = $el.data('value');
-      addEventListener(self, 'change', function () {
-        self[key] = $el.val();
-      }, this);
-      addEventListener(self, 'keyup', function () {
-        self[key] = $el.val();
-      }, this);
-    });
-  };
+  me.onAfterRender = function () {};
 
   function onNewProperty(o, prop, newValue) {
     log('onNewProperty', arguments);
@@ -489,7 +532,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     log('onCollectionInserted', arguments);
 
     me.tickContext.push(c.id + '@inserted', function () {
-      c.trigger('inserted', index);
+      c.trigger('inserted', index, value);
     });
   }
 

@@ -105,6 +105,8 @@
       onCollectionInserted(this, index, models)
     }
 
+    move () {}
+
     remove (models) {}
     clear () {}
     reset (models) {}
@@ -153,7 +155,6 @@
       this.scripts = params.scripts
       this.options = params.options
       this.observer = new Observer()
-      this.children = new Collection()
 
       identify(this)
     }
@@ -177,14 +178,14 @@
 
     render () {
       const self = this
-      me.nextTick(() => {
+      // me.nextTick(() => {
         me.onBeforeRender.call(self)
         this.doRender()
         // FIXME: to addEventListener
         self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self)
 
         me.onAfterRender.call(self)
-      })
+      // })
     }
 
     find () {
@@ -203,6 +204,8 @@
     scanElm (el) {
       const self = this
       const $el = $(el)
+
+      this.scanValues($el)
 
       const text = $el.text()
       const m = scopeRegex.exec(text)
@@ -223,9 +226,22 @@
       })
     }
 
+    scanValues ($el) {
+      const self = this
+      $el.find('input[data-value]').each(function () {
+        const $el = $(this)
+        const key = $el.data('value')
+        addEventListener(self, 'change', () => {
+          self[key] = $el.val()
+        }, this)
+        addEventListener(self, 'keyup', () => {
+          self[key] = $el.val()
+        }, this)
+      })
+    }
+
     scanAttr (el, key, val) {
       const $el = $(el)
-
       const name = val.nodeName
       const m = scopeRegex.exec(val.textContent)
       if (m) {
@@ -243,33 +259,38 @@
           const typeName = $itemEl.attr('data-type')
           if (typeName) {
             $itemEl.removeAttr('data-type')
-            list.each((item) => {
-              const scope = ComponentType.find(typeName).mixTo(
-                $($itemEl.clone()
-              ).appendTo($el), item)
-              this.children.push(scope)
+            const component = ComponentType.find(typeName)
+            list.each((item, index) => {
+              const templates = $itemEl.clone()
+              templates.append($(component.templates).clone())
+              const scope = new IndexedScope({
+                el: el,
+                templates: templates,
+                scripts: component.scripts,
+                index: index,
+                options: item
+              })
+              scope.bootstrap()
             })
           } else {
-            const creator = (item) => {
-              const scope = new FilledScope({
+            const creator = (item, index) => {
+              const scope = new IndexedScope({
                 el: el,
                 templates: $itemEl.clone(),
                 scripts: function () { scope.$this = item },
+                index: index,
                 options: {}
               })
+              scope.bootstrap()
               return scope
             }
 
-            list.each((item) => {
-              const scope = creator(item)
-              this.children.push(scope)
-              scope.bootstrap()
+            list.each((item, index) => {
+              const scope = creator(item, index)
             })
 
             list.on('inserted', (index) => {
-              const scope = creator(list.at(index))
-              this.children.insert(index, scope)
-              scope.bootstrap()
+              const scope = creator(list.at(index), index)
             })
           }
           $el.removeAttr('data-list')
@@ -298,6 +319,25 @@
     }
   }
 
+  class IndexedScope extends FilledScope {
+    constructor (params) {
+      super(params)
+      this.index = params.index
+    }
+
+    doRender () {
+      if (this.index === 0) {
+        return $(this.el).append(this.template)
+      }
+      const $target = $(this.el).children(`*:nth-child(${this.index})`)
+      if ($target.size() === 0) {
+        throw new Error(`*:nth-child(${this.index}) not found`)
+      }
+
+      return $target.after(this.template)
+    }
+  }
+
   // el is top of elements
   class PartScope extends Scope {
     doRender () {
@@ -309,7 +349,7 @@
     }
   }
 
-  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop', 'trigger', 'bootstrap', 'observer']
+  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop', 'trigger', 'bootstrap', 'observer', 'index']
 
   if (global.setImmediate) {
     me.nextTick = func => {
@@ -317,24 +357,12 @@
     }
   } else {
     me.nextTick = func => {
-      global.setTimeout(decorateEventable(null, 'tick', func), 0)
+      global.setTimeout(decorateEventable(null, 'tick', func), 100)
     }
   }
 
   me.onBeforeRender = () => {}
-  me.onAfterRender = function () {
-    const self = this
-    $(self.el).find('input[data-value]').each(function () {
-      const $el = $(this)
-      const key = $el.data('value')
-      addEventListener(self, 'change', () => {
-        self[key] = $el.val()
-      }, this)
-      addEventListener(self, 'keyup', () => {
-        self[key] = $el.val()
-      }, this)
-    })
-  }
+  me.onAfterRender = function () {}
 
   function onNewProperty (o, prop, newValue) {
     log('onNewProperty', arguments)
@@ -360,7 +388,7 @@
     log('onCollectionInserted', arguments)
 
     me.tickContext.push(`${c.id}@inserted`, () => {
-      c.trigger('inserted', index)
+      c.trigger('inserted', index, value)
     })
   }
 
