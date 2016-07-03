@@ -119,23 +119,22 @@
   }
 
   // me ////////////////////////////////////////////////
+  function listenateProp (o, prop) {
+    let value = o[prop]
+    Object.defineProperty(o, prop, {
+      get () { return value },
+      set (newValue) {
+        const oldValue = value
+        onBeforePropertyChange(o, prop, value, newValue)
+        value = newValue
+        onAfterPropertyChange(o, prop, value, oldValue)
+      },
+      enumerable: true,
+      configurable: true
+    })
+  }
 
   function listenate (o) {
-    function listenateProp (o, prop) {
-      let value = o[prop]
-      Object.defineProperty(o, prop, {
-        get () { return value },
-        set (newValue) {
-          const oldValue = value
-          onBeforePropertyChange(o, prop, value, newValue)
-          value = newValue
-          onAfterPropertyChange(o, prop, value, oldValue)
-        },
-        enumerable: true,
-        configurable: true
-      })
-    }
-
     const ret = []
     each(o, (value, key) => {
       if (me.defaultProperties.indexOf(key) !== -1) return
@@ -161,7 +160,7 @@
 
     bootstrap () {
       if (typeof this.scripts === 'function') {
-        this.scripts(this.options, this)
+        this.scripts.bind(this)(this.options, this)
       } else {
         evalInContext(this.scripts, this)
       }
@@ -228,15 +227,24 @@
 
     scanValues ($el) {
       const self = this
-      $el.find('input[data-value]').each(function () {
+      $el.find('input[value]').each(function () {
         const $el = $(this)
-        const key = $el.data('value')
+        const value = $el.val()
+        const m = scopeRegex.exec(value)
+        if (!m) return
+
+        const key = m[1]
+        $el.val(self[key])
         addEventListener(self, 'change', () => {
           self[key] = $el.val()
         }, this)
         addEventListener(self, 'keyup', () => {
           self[key] = $el.val()
         }, this)
+
+        self.on(key, () => {
+          $el.val(self[key])
+        })
       })
     }
 
@@ -251,14 +259,14 @@
             this[key](e)
           }, el)
           $(el).removeAttr(name)
-        } else if (name === 'data-list') {
+        } else if (name === 'w:list') {
           const list = this[key]
           const $itemEl = $($el.children())
           $itemEl.remove()
 
-          const typeName = $itemEl.attr('data-type')
+          const typeName = $itemEl.attr('w:type')
           if (typeName) {
-            $itemEl.removeAttr('data-type')
+            $itemEl.removeAttr('w:type')
             const component = ComponentType.find(typeName)
             list.each((item, index) => {
               const templates = $itemEl.clone()
@@ -293,7 +301,7 @@
               const scope = creator(list.at(index), index)
             })
           }
-          $el.removeAttr('data-list')
+          $el.removeAttr('w:list')
           return
         }
       }
@@ -315,7 +323,7 @@
     }
 
     doSetId () {
-      $(this.template).attr('data-id', this.id)
+      $(this.template).attr('w:id', this.id)
     }
   }
 
@@ -345,7 +353,7 @@
     }
 
     doSetId () {
-      $(this.el).attr('data-id', this.id)
+      $(this.el).attr('w:id', this.id)
     }
   }
 
@@ -357,7 +365,7 @@
     }
   } else {
     me.nextTick = func => {
-      global.setTimeout(decorateEventable(null, 'tick', func), 100)
+      global.setTimeout(decorateEventable(null, 'tick', func), 0)
     }
   }
 
@@ -391,9 +399,6 @@
       c.trigger('inserted', index, value)
     })
   }
-
-  // var c = new me.Collection([1, 2, 3])
-  // c.insert(2, 4)
 
   // @see http://stackoverflow.com/questions/8403108/calling-eval-in-particular-context
   function evalInContext (js, context) {

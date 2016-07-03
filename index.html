@@ -1,40 +1,21 @@
-<html>
+<html prefix="w: http://waitronjs.com">
   <head>
     <meta charset="utf-8">
   </head>
   <body>
-    <!-- <script type="text/waitron" type="text/template">
-      <template>
-        <% for(var i = 0; i < items.length; ++i) { %>
-          <div><%-items[i]%>|<%-name%></div>
-        <% } %>
-      </template>
-      <initialize>
-        this.items = [1,2,3];
-        this.name = "mytest!"
-        this.on('click', function(){
-          //alert('test');
-          self.name = "aaaaa"
-          self.items.push(self.items.length + 1)
-        })
-      </initialize>
-    </script> -->
-
-
     <div id="testImpl"></div>
-
 
     <template id="strList">
       <h3>strList</h3>
-      <ul data-list="{items}">
+      <ul w:list="{items}">
         <li><a href="#">{$this}</a></li>
       </ul>
     </template>
     <div id="strListImpl"></div>
 
     <template id="titleList">
-      <ul data-list="{items}">
-        <li data-type="titleBind"></li>
+      <ul w:list="{items}">
+        <li w:type="titleBind"></li>
       </ul>
     </template>
     <div id="titleListImpl"></div>
@@ -50,7 +31,7 @@
       <h1 onclick="{h1Clicked}">{title}</h1>
       <h2>{subtitle}</h2>
       <form>
-        <input type="text" data-value="title">
+        <input type="text" value="{title}">
       </form>
     </template>
     <script>
@@ -58,6 +39,7 @@
         scope.title = options.title || "テスト"
         scope.subtitle = options.subtitle || new Date
 
+        // if using `this`, why was binding value window? In spite of using bind
         scope.h1Clicked = (e) => {
           scope.title = "ああああ"
         }

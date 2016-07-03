@@ -178,25 +178,26 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
   // me ////////////////////////////////////////////////
 
+
+  function listenateProp(o, prop) {
+    var value = o[prop];
+    Object.defineProperty(o, prop, {
+      get: function get() {
+        return value;
+      },
+      set: function set(newValue) {
+        var oldValue = value;
+        onBeforePropertyChange(o, prop, value, newValue);
+        value = newValue;
+        onAfterPropertyChange(o, prop, value, oldValue);
+      },
+
+      enumerable: true,
+      configurable: true
+    });
+  }
+
   function listenate(o) {
-    function listenateProp(o, prop) {
-      var value = o[prop];
-      Object.defineProperty(o, prop, {
-        get: function get() {
-          return value;
-        },
-        set: function set(newValue) {
-          var oldValue = value;
-          onBeforePropertyChange(o, prop, value, newValue);
-          value = newValue;
-          onAfterPropertyChange(o, prop, value, oldValue);
-        },
-
-        enumerable: true,
-        configurable: true
-      });
-    }
-
     var ret = [];
     _each(o, function (value, key) {
       if (me.defaultProperties.indexOf(key) !== -1) return;
@@ -226,7 +227,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       key: 'bootstrap',
       value: function bootstrap() {
         if (typeof this.scripts === 'function') {
-          this.scripts(this.options, this);
+          this.scripts.bind(this)(this.options, this);
         } else {
           evalInContext(this.scripts, this);
         }
@@ -303,15 +304,24 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       key: 'scanValues',
       value: function scanValues($el) {
         var self = this;
-        $el.find('input[data-value]').each(function () {
+        $el.find('input[value]').each(function () {
           var $el = $(this);
-          var key = $el.data('value');
+          var value = $el.val();
+          var m = scopeRegex.exec(value);
+          if (!m) return;
+
+          var key = m[1];
+          $el.val(self[key]);
           addEventListener(self, 'change', function () {
             self[key] = $el.val();
           }, this);
           addEventListener(self, 'keyup', function () {
             self[key] = $el.val();
           }, this);
+
+          self.on(key, function () {
+            $el.val(self[key]);
+          });
         });
       }
     }, {
@@ -330,16 +340,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
                 _this4[key](e);
               }, el);
               $(el).removeAttr(name);
-            } else if (name === 'data-list') {
+            } else if (name === 'w:list') {
               var _ret3 = function () {
                 var list = _this4[key];
                 var $itemEl = $($el.children());
                 $itemEl.remove();
 
-                var typeName = $itemEl.attr('data-type');
+                var typeName = $itemEl.attr('w:type');
                 if (typeName) {
                   (function () {
-                    $itemEl.removeAttr('data-type');
+                    $itemEl.removeAttr('w:type');
                     var component = ComponentType.find(typeName);
                     list.each(function (item, index) {
                       var templates = $itemEl.clone();
@@ -379,7 +389,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
                     });
                   })();
                 }
-                $el.removeAttr('data-list');
+                $el.removeAttr('w:list');
                 return {
                   v: {
                     v: void 0
@@ -429,7 +439,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'doSetId',
       value: function doSetId() {
-        $(this.template).attr('data-id', this.id);
+        $(this.template).attr('w:id', this.id);
       }
     }]);
 
@@ -486,7 +496,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'doSetId',
       value: function doSetId() {
-        $(this.el).attr('data-id', this.id);
+        $(this.el).attr('w:id', this.id);
       }
     }]);
 
@@ -501,7 +511,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     };
   } else {
     me.nextTick = function (func) {
-      global.setTimeout(decorateEventable(null, 'tick', func), 100);
+      global.setTimeout(decorateEventable(null, 'tick', func), 0);
     };
   }
 
@@ -535,9 +545,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       c.trigger('inserted', index, value);
     });
   }
-
-  // var c = new me.Collection([1, 2, 3])
-  // c.insert(2, 4)
 
   // @see http://stackoverflow.com/questions/8403108/calling-eval-in-particular-context
   function evalInContext(js, context) {
