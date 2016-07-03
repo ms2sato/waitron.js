@@ -234,7 +234,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       key: 'bootstrap',
       value: function bootstrap() {
         if (typeof this.scripts === 'function') {
-          this.scripts.bind(this)(this.options, this);
+          this.scripts.bind(this).call(this, this.options, this);
         } else {
           evalInContext(this.scripts, this);
         }

@@ -165,7 +165,7 @@
 
     bootstrap () {
       if (typeof this.scripts === 'function') {
-        this.scripts.bind(this)(this.options, this)
+        this.scripts.bind(this).call(this, this.options, this)
       } else {
         evalInContext(this.scripts, this)
       }

@@ -35,17 +35,16 @@
       </form>
     </template>
     <script>
-      w.import(titleBind, (options, scope) => {
-        scope.title = options.title || "テスト"
-        scope.subtitle = options.subtitle || new Date
+      w.import(titleBind, function (options) {
+        this.title = options.title || "テスト"
+        this.subtitle = options.subtitle || new Date
 
-        // if using `this`, why was binding value window? In spite of using bind
-        scope.h1Clicked = (e) => {
-          scope.title = "ああああ"
+        this.h1Clicked = (e) => {
+          this.title = "ああああ"
         }
 
-        scope.on('change:title', () => {
-          scope.subtitle = scope.title + new Date
+        this.on('change:title', () => {
+          this.subtitle = this.title + new Date
         })
       })
     </script>
@@ -76,9 +75,6 @@
           {title: 'オプション'},
           {title: 'タイトル2', subtitle: 'sub'}
         ])
-
-        this.onRendered = function () {
-        }
       });
       var cmp = type.mixTo(titleListImpl)
     </script>
