@@ -28,7 +28,11 @@
   }
 
   // me ////////////////////////////////////////////////
-  var me = function waitron () {}
+  var me = function waitron (obj) {
+    if (Array.isArray(obj)) {
+      return new Collection(obj)
+    }
+  }
 
   function delegate (prototype, to, name) {
     if (Array.isArray(name)) {
@@ -178,14 +182,14 @@
 
     render () {
       const self = this
-      // me.nextTick(() => {
+      me.nextTick(() => {
         me.onBeforeRender.call(self)
         this.doRender()
         // FIXME: to addEventListener
         self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self)
 
         me.onAfterRender.call(self)
-      // })
+      })
     }
 
     find () {

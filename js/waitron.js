@@ -42,7 +42,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }
 
   // me ////////////////////////////////////////////////
-  var me = function waitron() {};
+  var me = function waitron(obj) {
+    if (Array.isArray(obj)) {
+      return new Collection(obj);
+    }
+  };
 
   function delegate(prototype, to, name) {
     if (Array.isArray(name)) {
@@ -247,15 +251,17 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'render',
       value: function render() {
-        var self = this;
-        // me.nextTick(() => {
-        me.onBeforeRender.call(self);
-        this.doRender();
-        // FIXME: to addEventListener
-        self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self);
+        var _this3 = this;
 
-        me.onAfterRender.call(self);
-        // })
+        var self = this;
+        me.nextTick(function () {
+          me.onBeforeRender.call(self);
+          _this3.doRender();
+          // FIXME: to addEventListener
+          self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self);
+
+          me.onAfterRender.call(self);
+        });
       }
     }, {
       key: 'find',
@@ -276,7 +282,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'scanElm',
       value: function scanElm(el) {
-        var _this3 = this;
+        var _this4 = this;
 
         var self = this;
         var $el = $(el);
@@ -296,11 +302,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         }
 
         _each(el.attributes, function (val, key) {
-          _this3.scanAttr(el, key, val);
+          _this4.scanAttr(el, key, val);
         });
 
         $(el).children().each(function (i, el) {
-          _this3.scanElm(el);
+          _this4.scanElm(el);
         });
       }
     }, {
@@ -330,7 +336,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'scanAttr',
       value: function scanAttr(el, key, val) {
-        var _this4 = this;
+        var _this5 = this;
 
         var $el = $(el);
         var name = val.nodeName;
@@ -339,13 +345,13 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           var _ret2 = function () {
             var key = m[1];
             if (name.substr(0, 2) === 'on') {
-              addEventListener(_this4, name.substr(2), function (e) {
-                _this4[key](e);
+              addEventListener(_this5, name.substr(2), function (e) {
+                _this5[key](e);
               }, el);
               $(el).removeAttr(name);
             } else if (name === 'w:list') {
               var _ret3 = function () {
-                var list = _this4[key];
+                var list = _this5[key];
                 var $itemEl = $($el.children());
                 $itemEl.remove();
 
@@ -410,10 +416,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'scan',
       value: function scan() {
-        var _this5 = this;
+        var _this6 = this;
 
         this.template.each(function (i, el) {
-          _this5.scanElm(el);
+          _this6.scanElm(el);
         });
       }
     }]);
@@ -455,10 +461,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     function IndexedScope(params) {
       _classCallCheck(this, IndexedScope);
 
-      var _this7 = _possibleConstructorReturn(this, Object.getPrototypeOf(IndexedScope).call(this, params));
+      var _this8 = _possibleConstructorReturn(this, Object.getPrototypeOf(IndexedScope).call(this, params));
 
-      _this7.index = params.index;
-      return _this7;
+      _this8.index = params.index;
+      return _this8;
     }
 
     _createClass(IndexedScope, [{

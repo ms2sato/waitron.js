@@ -56,7 +56,7 @@
 
     <script>
       var type = w.import(strList, function(options){
-        this.items = new w.Collection([1,2,3])
+        this.items = w([1,2,3])
         var self = this
         this.onRendered = function () {
           self.items.insert(2, 4)
@@ -72,7 +72,7 @@
 
     <script>
       var type = w.import(titleList, function(options){
-        this.items = new w.Collection([
+        this.items = w([
           {title: 'オプション'},
           {title: 'タイトル2', subtitle: 'sub'}
         ])
