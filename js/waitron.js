@@ -41,6 +41,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return o;
   }
 
+  function isFunction(o) {
+    return typeof o === 'function';
+  }
+
   // me ////////////////////////////////////////////////
   var me = function waitron(obj) {
     if (Array.isArray(obj)) {
@@ -202,9 +206,15 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }
 
   function listenate(o) {
+    var checker = arguments.length <= 1 || arguments[1] === undefined ? function () {
+      return true;
+    } : arguments[1];
+
     var ret = [];
     _each(o, function (value, key) {
-      if (me.defaultProperties.indexOf(key) !== -1) return;
+      if (!checker(key, value, o)) return;
+
+      log('lisnated: ' + key);
 
       listenateProp(o, key);
       ret.push(key);
@@ -218,214 +228,236 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }
 
   var Scope = function () {
-    function Scope(params) {
-      _classCallCheck(this, Scope);
+    function addEventListener(scope, eventName, listener) {
+      var el = arguments.length <= 3 || arguments[3] === undefined ? scope.el : arguments[3];
 
-      this.el = params.el;
-      this.templates = params.templates;
-      this.scripts = params.scripts;
-      this.options = params.options;
-      this.observer = new Observer();
-
-      identify(this);
+      if (el.addEventListener) {
+        return el.addEventListener(eventName, decorateEventable(scope, eventName, listener), true);
+      }
+      if (el.attachEvent) {
+        return el.attachEvent(eventName, decorateEventable(scope, eventName, listener));
+      }
     }
 
-    _createClass(Scope, [{
-      key: 'bootstrap',
-      value: function bootstrap() {
-        if (typeof this.scripts === 'function') {
-          this.scripts.bind(this).call(this, this.options, this);
-        } else {
-          evalInContext(this.scripts, this);
-        }
+    var Scope = function () {
+      function Scope(params) {
+        _classCallCheck(this, Scope);
 
-        listenate(this);
+        this.el = params.el;
+        this.templates = params.templates;
+        this.scripts = params.scripts;
+        this.options = params.options;
+        this.observer = new Observer();
 
-        this.template = $(this.templates);
-        this.doSetId();
-        console.log(this.templates);
-
-        this.scan();
-        this.render();
-      }
-    }, {
-      key: 'render',
-      value: function render() {
-        var _this3 = this;
-
-        var self = this;
-        me.nextTick(function () {
-          me.onBeforeRender.call(self);
-          _this3.doRender();
-          _this3.trigger('rendered');
-          me.onAfterRender.call(self);
-        });
-      }
-    }, {
-      key: 'find',
-      value: function find() {
-        var $el = $(this.el);
-        return $el.find.apply($el, arguments);
-      }
-    }, {
-      key: 'prop',
-      value: function prop(key) {
-        var p = this[key];
-        if ($.isFunction(p)) return p();
-        return p;
+        identify(this);
       }
 
-      // private
+      _createClass(Scope, [{
+        key: 'bootstrap',
+        value: function bootstrap() {
+          var _this3 = this;
 
-    }, {
-      key: 'scanElm',
-      value: function scanElm(el) {
-        var _this4 = this;
+          this.unlistenatedProperties = []; // for includes unlistenatedProperties
+          this.unlistenatedProperties = Object.getOwnPropertyNames(this);
 
-        var self = this;
-        var $el = $(el);
+          if (isFunction(this.scripts)) {
+            this.scripts.bind(this).call(this, this.options, this);
+          } else {
+            evalInContext(this.scripts, this);
+          }
 
-        this.scanValues($el);
-
-        var text = $el.text();
-        var m = scopeRegex.exec(text);
-        if (m) {
-          (function () {
-            var prop = m[1];
-            self.on(getChangeEventName(prop), function (e) {
-              $el.text(self[prop]);
-            });
-            $el.text(self[prop]);
-          })();
-        }
-
-        _each(el.attributes, function (val, key) {
-          _this4.scanAttr(el, key, val);
-        });
-
-        $(el).children().each(function (i, el) {
-          _this4.scanElm(el);
-        });
-      }
-    }, {
-      key: 'scanValues',
-      value: function scanValues($el) {
-        var self = this;
-        $el.find('input[value]').each(function () {
-          var $el = $(this);
-          var value = $el.val();
-          var m = scopeRegex.exec(value);
-          if (!m) return;
-
-          var key = m[1];
-          $el.val(self[key]);
-          addEventListener(self, 'change', function () {
-            self[key] = $el.val();
-          }, this);
-          addEventListener(self, 'keyup', function () {
-            self[key] = $el.val();
-          }, this);
-
-          self.on(getChangeEventName(key), function () {
-            $el.val(self[key]);
+          listenate(this, function (key, value, o) {
+            return !isFunction(value) && !_this3.unlistenatedProperties.includes(key);
           });
-        });
-      }
-    }, {
-      key: 'scanAttr',
-      value: function scanAttr(el, key, val) {
-        var _this5 = this;
 
-        var $el = $(el);
-        var name = val.nodeName;
-        var m = scopeRegex.exec(val.textContent);
-        if (m) {
-          var _ret2 = function () {
-            var key = m[1];
-            if (name.substr(0, 2) === 'on') {
-              addEventListener(_this5, name.substr(2), function (e) {
-                _this5[key](e);
-              }, el);
-              $(el).removeAttr(name);
-            } else if (name === 'w:list') {
-              var _ret3 = function () {
-                var list = _this5[key];
-                var $itemEl = $($el.children());
-                $itemEl.remove();
+          this.template = $(this.templates);
+          this.doSetId();
+          log(this.templates);
 
-                var typeName = $itemEl.attr('w:type');
-                if (typeName) {
-                  (function () {
-                    $itemEl.removeAttr('w:type');
-                    var component = ComponentType.find(typeName);
-                    list.each(function (item, index) {
-                      var templates = $itemEl.clone();
-                      templates.append($(component.templates).clone());
-                      var scope = new IndexedScope({
-                        el: el,
-                        templates: templates,
-                        scripts: component.scripts,
-                        index: index,
-                        options: item
-                      });
-                      scope.bootstrap();
-                    });
-                  })();
-                } else {
-                  (function () {
-                    var creator = function creator(item, index) {
-                      var scope = new IndexedScope({
-                        el: el,
-                        templates: $itemEl.clone(),
-                        scripts: function scripts() {
-                          scope.$this = item;
-                        },
-                        index: index,
-                        options: {}
-                      });
-                      scope.bootstrap();
-                      return scope;
-                    };
-
-                    list.each(function (item, index) {
-                      var scope = creator(item, index);
-                    });
-
-                    list.on('inserted', function (index) {
-                      var scope = creator(list.at(index), index);
-                    });
-                  })();
-                }
-                $el.removeAttr('w:list');
-                return {
-                  v: {
-                    v: void 0
-                  }
-                };
-              }();
-
-              if ((typeof _ret3 === 'undefined' ? 'undefined' : _typeof(_ret3)) === "object") return _ret3.v;
-            }
-          }();
-
-          if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
+          this.scan();
+          this.render();
         }
-      }
-    }, {
-      key: 'scan',
-      value: function scan() {
-        var _this6 = this;
+      }, {
+        key: 'render',
+        value: function render() {
+          var _this4 = this;
 
-        this.template.each(function (i, el) {
-          _this6.scanElm(el);
-        });
-      }
-    }]);
+          var self = this;
+          me.nextTick(function () {
+            me.onBeforeRender.call(self);
+            _this4.doRender();
+            _this4.trigger('rendered');
+            me.onAfterRender.call(self);
+          });
+        }
+      }, {
+        key: 'find',
+        value: function find() {
+          var $el = $(this.el);
+          return $el.find.apply($el, arguments);
+        }
+      }, {
+        key: 'prop',
+        value: function prop(key) {
+          var p = this[key];
+          if ($.isFunction(p)) return p();
+          return p;
+        }
+
+        // private
+
+      }, {
+        key: 'scanElm',
+        value: function scanElm(el) {
+          var _this5 = this;
+
+          var self = this;
+          var $el = $(el);
+
+          this.scanValues($el);
+
+          var text = $el.text();
+          var m = scopeRegex.exec(text);
+          if (m) {
+            (function () {
+              var prop = m[1];
+              self.on(getChangeEventName(prop), function (e) {
+                $el.text(self[prop]);
+              });
+              $el.text(self[prop]);
+            })();
+          }
+
+          _each(el.attributes, function (val, key) {
+            _this5.scanAttr(el, key, val);
+          });
+
+          $(el).children().each(function (i, el) {
+            _this5.scanElm(el);
+          });
+        }
+      }, {
+        key: 'scanValues',
+        value: function scanValues($el) {
+          var self = this;
+          $el.find('input[value]').each(function () {
+            var $el = $(this);
+            var value = $el.val();
+            var m = scopeRegex.exec(value);
+            if (!m) return;
+
+            var key = m[1];
+            $el.val(self[key]);
+            addEventListener(self, 'change', function () {
+              self[key] = $el.val();
+            }, this);
+            addEventListener(self, 'keyup', function () {
+              self[key] = $el.val();
+            }, this);
+
+            self.on(getChangeEventName(key), function () {
+              $el.val(self[key]);
+            });
+          });
+        }
+      }, {
+        key: 'scanAttr',
+        value: function scanAttr(el, key, val) {
+          var _this6 = this;
+
+          var $el = $(el);
+          var name = val.nodeName;
+          var m = scopeRegex.exec(val.textContent);
+          if (m) {
+            var _ret2 = function () {
+              var key = m[1];
+              if (name.substr(0, 2) === 'on') {
+                addEventListener(_this6, name.substr(2), function (e) {
+                  _this6[key](e);
+                }, el);
+                $(el).removeAttr(name);
+              } else if (name === 'w:list') {
+                var _ret3 = function () {
+                  var list = _this6[key];
+                  var $itemEl = $($el.children());
+                  $itemEl.remove();
+
+                  var typeName = $itemEl.attr('w:type');
+                  if (typeName) {
+                    (function () {
+                      $itemEl.removeAttr('w:type');
+                      var component = ComponentType.find(typeName);
+                      list.each(function (item, index) {
+                        var templates = $itemEl.clone();
+                        templates.append($(component.templates).clone());
+                        var scope = new IndexedScope({
+                          el: el,
+                          templates: templates,
+                          scripts: component.scripts,
+                          index: index,
+                          options: item
+                        });
+                        scope.bootstrap();
+                      });
+                    })();
+                  } else {
+                    (function () {
+                      var creator = function creator(item, index) {
+                        var scope = new IndexedScope({
+                          el: el,
+                          templates: $itemEl.clone(),
+                          scripts: function scripts() {
+                            scope.$this = item;
+                          },
+                          index: index,
+                          options: {}
+                        });
+                        scope.bootstrap();
+                        return scope;
+                      };
+
+                      list.each(function (item, index) {
+                        var scope = creator(item, index);
+                      });
+
+                      list.on('inserted', function (index) {
+                        var scope = creator(list.at(index), index);
+                      });
+                    })();
+                  }
+                  $el.removeAttr('w:list');
+                  return {
+                    v: {
+                      v: void 0
+                    }
+                  };
+                }();
+
+                if ((typeof _ret3 === 'undefined' ? 'undefined' : _typeof(_ret3)) === "object") return _ret3.v;
+              }
+            }();
+
+            if ((typeof _ret2 === 'undefined' ? 'undefined' : _typeof(_ret2)) === "object") return _ret2.v;
+          }
+        }
+      }, {
+        key: 'scan',
+        value: function scan() {
+          var _this7 = this;
+
+          this.template.each(function (i, el) {
+            _this7.scanElm(el);
+          });
+        }
+      }]);
+
+      return Scope;
+    }();
+
+    delegate(Scope.prototype, 'observer', ['on', 'trigger']);
 
     return Scope;
   }();
-
-  delegate(Scope.prototype, 'observer', ['on', 'trigger']);
 
   // el is parent of element
 
@@ -459,10 +491,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     function IndexedScope(params) {
       _classCallCheck(this, IndexedScope);
 
-      var _this8 = _possibleConstructorReturn(this, Object.getPrototypeOf(IndexedScope).call(this, params));
+      var _this9 = _possibleConstructorReturn(this, Object.getPrototypeOf(IndexedScope).call(this, params));
 
-      _this8.index = params.index;
-      return _this8;
+      _this9.index = params.index;
+      return _this9;
     }
 
     _createClass(IndexedScope, [{
@@ -509,8 +541,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
     return PartScope;
   }(Scope);
-
-  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop', 'trigger', 'bootstrap', 'observer', 'index'];
 
   if (global.setImmediate) {
     me.nextTick = function (func) {
@@ -579,16 +609,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       }
     };
   };
-  function addEventListener(scope, eventName, listener) {
-    var el = arguments.length <= 3 || arguments[3] === undefined ? scope.el : arguments[3];
-
-    if (el.addEventListener) {
-      return el.addEventListener(eventName, decorateEventable(scope, eventName, listener), true);
-    }
-    if (el.attachEvent) {
-      return el.attachEvent(eventName, decorateEventable(scope, eventName, listener));
-    }
-  }
 
   var TickContext = function () {
     function TickContext(scope, eventName, event, listener) {

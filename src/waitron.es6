@@ -27,6 +27,10 @@
     return o
   }
 
+  function isFunction (o) {
+    return typeof o === 'function'
+  }
+
   // me ////////////////////////////////////////////////
   var me = function waitron (obj) {
     if (Array.isArray(obj)) {
@@ -138,10 +142,12 @@
     })
   }
 
-  function listenate (o) {
+  function listenate (o, checker = function () { return true }) {
     const ret = []
     each(o, (value, key) => {
-      if (me.defaultProperties.indexOf(key) !== -1) return
+      if (!checker(key, value, o)) return
+
+      log(`lisnated: ${key}`)
 
       listenateProp(o, key)
       ret.push(key)
@@ -152,172 +158,190 @@
   const scopeRegex = /\{([\s\S]*)\}/
   function getChangeEventName (prop) { return `change:${prop}` }
 
-  class Scope {
-    constructor (params) {
-      this.el = params.el
-      this.templates = params.templates
-      this.scripts = params.scripts
-      this.options = params.options
-      this.observer = new Observer()
-
-      identify(this)
+  const Scope = (() => {
+    function addEventListener (scope, eventName, listener, el = scope.el) {
+      if (el.addEventListener) {
+        return el.addEventListener(eventName, decorateEventable(scope, eventName, listener), true)
+      }
+      if (el.attachEvent) {
+        return el.attachEvent(eventName, decorateEventable(scope, eventName, listener))
+      }
     }
 
-    bootstrap () {
-      if (typeof this.scripts === 'function') {
-        this.scripts.bind(this).call(this, this.options, this)
-      } else {
-        evalInContext(this.scripts, this)
+    class Scope {
+      constructor (params) {
+        this.el = params.el
+        this.templates = params.templates
+        this.scripts = params.scripts
+        this.options = params.options
+        this.observer = new Observer()
+
+        identify(this)
       }
 
-      listenate(this)
+      bootstrap () {
+        this.unlistenatedProperties = [] // for includes unlistenatedProperties
+        this.unlistenatedProperties = Object.getOwnPropertyNames(this)
 
-      this.template = $(this.templates)
-      this.doSetId()
-      console.log(this.templates)
+        if (isFunction(this.scripts)) {
+          this.scripts.bind(this).call(this, this.options, this)
+        } else {
+          evalInContext(this.scripts, this)
+        }
 
-      this.scan()
-      this.render()
-    }
+        listenate(this, (key, value, o) => {
+          return !isFunction(value) && !this.unlistenatedProperties.includes(key)
+        })
 
-    render () {
-      const self = this
-      me.nextTick(() => {
-        me.onBeforeRender.call(self)
-        this.doRender()
-        this.trigger('rendered')
-        me.onAfterRender.call(self)
-      })
-    }
+        this.template = $(this.templates)
+        this.doSetId()
+        log(this.templates)
 
-    find () {
-      const $el = $(this.el)
-      return $el.find.apply($el, arguments)
-    }
+        this.scan()
+        this.render()
+      }
 
-    prop (key) {
-      const p = this[key]
-      if ($.isFunction(p)) return p()
-      return p
-    }
+      render () {
+        const self = this
+        me.nextTick(() => {
+          me.onBeforeRender.call(self)
+          this.doRender()
+          this.trigger('rendered')
+          me.onAfterRender.call(self)
+        })
+      }
 
-    // private
+      find () {
+        const $el = $(this.el)
+        return $el.find.apply($el, arguments)
+      }
 
-    scanElm (el) {
-      const self = this
-      const $el = $(el)
+      prop (key) {
+        const p = this[key]
+        if ($.isFunction(p)) return p()
+        return p
+      }
 
-      this.scanValues($el)
+      // private
 
-      const text = $el.text()
-      const m = scopeRegex.exec(text)
-      if (m) {
-        const prop = m[1]
-        self.on(getChangeEventName(prop), (e) => {
+      scanElm (el) {
+        const self = this
+        const $el = $(el)
+
+        this.scanValues($el)
+
+        const text = $el.text()
+        const m = scopeRegex.exec(text)
+        if (m) {
+          const prop = m[1]
+          self.on(getChangeEventName(prop), (e) => {
+            $el.text(self[prop])
+          })
           $el.text(self[prop])
+        }
+
+        each(el.attributes, (val, key) => {
+          this.scanAttr(el, key, val)
         })
-        $el.text(self[prop])
+
+        $(el).children().each((i, el) => {
+          this.scanElm(el)
+        })
       }
 
-      each(el.attributes, (val, key) => {
-        this.scanAttr(el, key, val)
-      })
+      scanValues ($el) {
+        const self = this
+        $el.find('input[value]').each(function () {
+          const $el = $(this)
+          const value = $el.val()
+          const m = scopeRegex.exec(value)
+          if (!m) return
 
-      $(el).children().each((i, el) => {
-        this.scanElm(el)
-      })
-    }
-
-    scanValues ($el) {
-      const self = this
-      $el.find('input[value]').each(function () {
-        const $el = $(this)
-        const value = $el.val()
-        const m = scopeRegex.exec(value)
-        if (!m) return
-
-        const key = m[1]
-        $el.val(self[key])
-        addEventListener(self, 'change', () => {
-          self[key] = $el.val()
-        }, this)
-        addEventListener(self, 'keyup', () => {
-          self[key] = $el.val()
-        }, this)
-
-        self.on(getChangeEventName(key), () => {
+          const key = m[1]
           $el.val(self[key])
+          addEventListener(self, 'change', () => {
+            self[key] = $el.val()
+          }, this)
+          addEventListener(self, 'keyup', () => {
+            self[key] = $el.val()
+          }, this)
+
+          self.on(getChangeEventName(key), () => {
+            $el.val(self[key])
+          })
         })
-      })
-    }
+      }
 
-    scanAttr (el, key, val) {
-      const $el = $(el)
-      const name = val.nodeName
-      const m = scopeRegex.exec(val.textContent)
-      if (m) {
-        const key = m[1]
-        if (name.substr(0, 2) === 'on') {
-          addEventListener(this, name.substr(2), (e) => {
-            this[key](e)
-          }, el)
-          $(el).removeAttr(name)
-        } else if (name === 'w:list') {
-          const list = this[key]
-          const $itemEl = $($el.children())
-          $itemEl.remove()
+      scanAttr (el, key, val) {
+        const $el = $(el)
+        const name = val.nodeName
+        const m = scopeRegex.exec(val.textContent)
+        if (m) {
+          const key = m[1]
+          if (name.substr(0, 2) === 'on') {
+            addEventListener(this, name.substr(2), (e) => {
+              this[key](e)
+            }, el)
+            $(el).removeAttr(name)
+          } else if (name === 'w:list') {
+            const list = this[key]
+            const $itemEl = $($el.children())
+            $itemEl.remove()
 
-          const typeName = $itemEl.attr('w:type')
-          if (typeName) {
-            $itemEl.removeAttr('w:type')
-            const component = ComponentType.find(typeName)
-            list.each((item, index) => {
-              const templates = $itemEl.clone()
-              templates.append($(component.templates).clone())
-              const scope = new IndexedScope({
-                el: el,
-                templates: templates,
-                scripts: component.scripts,
-                index: index,
-                options: item
+            const typeName = $itemEl.attr('w:type')
+            if (typeName) {
+              $itemEl.removeAttr('w:type')
+              const component = ComponentType.find(typeName)
+              list.each((item, index) => {
+                const templates = $itemEl.clone()
+                templates.append($(component.templates).clone())
+                const scope = new IndexedScope({
+                  el: el,
+                  templates: templates,
+                  scripts: component.scripts,
+                  index: index,
+                  options: item
+                })
+                scope.bootstrap()
               })
-              scope.bootstrap()
-            })
-          } else {
-            const creator = (item, index) => {
-              const scope = new IndexedScope({
-                el: el,
-                templates: $itemEl.clone(),
-                scripts: function () { scope.$this = item },
-                index: index,
-                options: {}
+            } else {
+              const creator = (item, index) => {
+                const scope = new IndexedScope({
+                  el: el,
+                  templates: $itemEl.clone(),
+                  scripts: function () { scope.$this = item },
+                  index: index,
+                  options: {}
+                })
+                scope.bootstrap()
+                return scope
+              }
+
+              list.each((item, index) => {
+                const scope = creator(item, index)
               })
-              scope.bootstrap()
-              return scope
+
+              list.on('inserted', (index) => {
+                const scope = creator(list.at(index), index)
+              })
             }
-
-            list.each((item, index) => {
-              const scope = creator(item, index)
-            })
-
-            list.on('inserted', (index) => {
-              const scope = creator(list.at(index), index)
-            })
+            $el.removeAttr('w:list')
+            return
           }
-          $el.removeAttr('w:list')
-          return
         }
       }
+
+      scan () {
+        this.template.each((i, el) => {
+          this.scanElm(el)
+        })
+      }
     }
 
-    scan () {
-      this.template.each((i, el) => {
-        this.scanElm(el)
-      })
-    }
-  }
+    delegate(Scope.prototype, 'observer', ['on', 'trigger'])
 
-  delegate(Scope.prototype, 'observer', ['on', 'trigger'])
+    return Scope
+  })()
 
   // el is parent of element
   class FilledScope extends Scope {
@@ -359,8 +383,6 @@
       $(this.el).attr('w:id', this.id)
     }
   }
-
-  me.defaultProperties = ['el', 'on', 'render', 'sync', 'find', 'prop', 'trigger', 'bootstrap', 'observer', 'index']
 
   if (global.setImmediate) {
     me.nextTick = func => {
@@ -427,15 +449,6 @@
       me.onEventFinally(scope, eventName, event, listener)
     }
   }
-  function addEventListener (scope, eventName, listener, el = scope.el) {
-    if (el.addEventListener) {
-      return el.addEventListener(eventName, decorateEventable(scope, eventName, listener), true)
-    }
-    if (el.attachEvent) {
-      return el.attachEvent(eventName, decorateEventable(scope, eventName, listener))
-    }
-  }
-
   class TickContext {
     constructor (scope, eventName, event, listener) {
       this.scope = scope
