@@ -17,7 +17,7 @@
 
   // @see http://qiita.com/Layzie/items/465e715dae14e2f601de
   function is (type, obj) {
-    var clas = Object.prototype.toString.call(obj).slice(8, -1)
+    const clas = Object.prototype.toString.call(obj).slice(8, -1)
     return obj !== undefined && obj !== null && clas === type
   }
 
@@ -74,7 +74,7 @@
   }
 
   // me ////////////////////////////////////////////////
-  var me = function waitron (obj) {
+  const me = function waitron (obj) {
     if (Array.isArray(obj)) {
       return new Collection(obj)
     }
@@ -436,7 +436,7 @@
     })
   }
 
-  var decorateEventable = (scope, eventName, listener) => event => {
+  const decorateEventable = (scope, eventName, listener) => event => {
     try {
       me.onBeforeEvent(scope, eventName, event, listener)
       const ret = listener.call(scope, event)
