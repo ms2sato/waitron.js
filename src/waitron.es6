@@ -228,7 +228,7 @@
 
       prop (key) {
         const p = this[key]
-        if ($.isFunction(p)) return p()
+        if (isFunction(p)) return p()
         return p
       }
 

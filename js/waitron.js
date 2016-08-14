@@ -312,7 +312,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         key: 'prop',
         value: function prop(key) {
           var p = this[key];
-          if ($.isFunction(p)) return p();
+          if (isFunction(p)) return p();
           return p;
         }
 
