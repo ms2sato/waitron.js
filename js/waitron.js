@@ -27,6 +27,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     console.log.apply(console, arguments);
   }
 
+  function isFunction(o) {
+    return typeof o === 'function';
+  }
+
   function _each(o, func) {
     if (Array.isArray(o)) {
       for (var i = 0; i < o.length; ++i) {
@@ -41,17 +45,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return o;
   }
 
-  function isFunction(o) {
-    return typeof o === 'function';
-  }
-
-  // me ////////////////////////////////////////////////
-  var me = function waitron(obj) {
-    if (Array.isArray(obj)) {
-      return new Collection(obj);
-    }
-  };
-
   function delegate(prototype, to, name) {
     if (Array.isArray(name)) {
       return _each(name, function (n) {
@@ -63,26 +56,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       this[to][name].apply(this[to], arguments);
     };
   }
-
-  var identify = function () {
-    var id_counter = 1;
-    return function identify(o) {
-      if (o.__uniqueId === undefined) {
-        // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
-        Object.defineProperty(o, '__uniqueId', {
-          writable: true
-        });
-
-        o.__uniqueId = id_counter++;
-
-        Object.defineProperty(o, 'id', {
-          get: function get() {
-            return this.__uniqueId;
-          }
-        });
-      }
-    };
-  }();
 
   var Observer = function () {
     function Observer() {
@@ -113,6 +86,35 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }]);
 
     return Observer;
+  }();
+
+  // me ////////////////////////////////////////////////
+
+
+  var me = function waitron(obj) {
+    if (Array.isArray(obj)) {
+      return new Collection(obj);
+    }
+  };
+
+  var identify = function () {
+    var id_counter = 1;
+    return function identify(o) {
+      if (o.__uniqueId === undefined) {
+        // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
+        Object.defineProperty(o, '__uniqueId', {
+          writable: true
+        });
+
+        o.__uniqueId = id_counter++;
+
+        Object.defineProperty(o, 'id', {
+          get: function get() {
+            return this.__uniqueId;
+          }
+        });
+      }
+    };
   }();
 
   var Collection = function (_Observer) {
@@ -184,7 +186,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return Collection;
   }(Observer);
 
-  // me ////////////////////////////////////////////////
+  // scope ////////////////////////////////////////////////
 
 
   function listenateProp(o, prop) {
@@ -417,11 +419,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
                       };
 
                       list.each(function (item, index) {
-                        var scope = creator(item, index);
+                        creator(item, index);
                       });
 
                       list.on('inserted', function (index) {
-                        var scope = creator(list.at(index), index);
+                        creator(list.at(index), index);
                       });
                     })();
                   }

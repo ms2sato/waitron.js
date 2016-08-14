@@ -15,6 +15,10 @@
     console.log.apply(console, arguments)
   }
 
+  function isFunction (o) {
+    return typeof o === 'function'
+  }
+
   function each (o, func) {
     if (Array.isArray(o)) {
       for (let i = 0; i < o.length; ++i) { func.call(o, o[i], i) }
@@ -27,17 +31,6 @@
     return o
   }
 
-  function isFunction (o) {
-    return typeof o === 'function'
-  }
-
-  // me ////////////////////////////////////////////////
-  var me = function waitron (obj) {
-    if (Array.isArray(obj)) {
-      return new Collection(obj)
-    }
-  }
-
   function delegate (prototype, to, name) {
     if (Array.isArray(name)) {
       return each(name, (n) => {
@@ -47,6 +40,33 @@
 
     prototype[name] = function () {
       this[to][name].apply(this[to], arguments)
+    }
+  }
+
+  class Observer {
+    constructor () {
+      this.listenersHash = {}
+    }
+
+    on (name, listener) {
+      if (!this.listenersHash[name]) {
+        this.listenersHash[name] = []
+      }
+      this.listenersHash[name].push(listener)
+    }
+
+    trigger () {
+      const name = Array.prototype.shift.call(arguments)
+      each(this.listenersHash[name], (listener) => {
+        listener.apply(this, arguments)
+      })
+    }
+  }
+
+  // me ////////////////////////////////////////////////
+  var me = function waitron (obj) {
+    if (Array.isArray(obj)) {
+      return new Collection(obj)
     }
   }
 
@@ -69,26 +89,6 @@
       }
     }
   })()
-
-  class Observer {
-    constructor () {
-      this.listenersHash = {}
-    }
-
-    on (name, listener) {
-      if (!this.listenersHash[name]) {
-        this.listenersHash[name] = []
-      }
-      this.listenersHash[name].push(listener)
-    }
-
-    trigger () {
-      const name = Array.prototype.shift.call(arguments)
-      each(this.listenersHash[name], (listener) => {
-        listener.apply(this, arguments)
-      })
-    }
-  }
 
   class Collection extends Observer {
     constructor (models) {
@@ -126,7 +126,7 @@
     }
   }
 
-  // me ////////////////////////////////////////////////
+  // scope ////////////////////////////////////////////////
   function listenateProp (o, prop) {
     let value = o[prop]
     Object.defineProperty(o, prop, {
@@ -318,11 +318,11 @@
               }
 
               list.each((item, index) => {
-                const scope = creator(item, index)
+                creator(item, index)
               })
 
               list.on('inserted', (index) => {
-                const scope = creator(list.at(index), index)
+                creator(list.at(index), index)
               })
             }
             $el.removeAttr('w:list')
