@@ -185,9 +185,7 @@
       me.nextTick(() => {
         me.onBeforeRender.call(self)
         this.doRender()
-        // FIXME: to addEventListener
-        self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self)
-
+        this.trigger('rendered')
         me.onAfterRender.call(self)
       })
     }

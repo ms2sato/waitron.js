@@ -257,9 +257,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         me.nextTick(function () {
           me.onBeforeRender.call(self);
           _this3.doRender();
-          // FIXME: to addEventListener
-          self.onRendered && decorateEventable(self, 'rendered', self.onRendered).call(self);
-
+          _this3.trigger('rendered');
           me.onAfterRender.call(self);
         });
       }

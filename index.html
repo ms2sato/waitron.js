@@ -56,10 +56,9 @@
     <script>
       var type = w.import(strList, function(options){
         this.items = w([1,2,3])
-        var self = this
-        this.onRendered = function () {
-          self.items.insert(2, 4)
-        }
+        this.on('rendered',  () => {
+          this.items.insert(2, 4)
+        })
       });
       var cmp = type.mixTo(strListImpl)
     </script>
