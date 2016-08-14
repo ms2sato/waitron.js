@@ -262,11 +262,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           this.unlistenatedProperties = []; // for includes unlistenatedProperties
           this.unlistenatedProperties = Object.getOwnPropertyNames(this);
 
-          if (isFunction(this.scripts)) {
-            this.scripts.bind(this).call(this, this.options, this);
-          } else {
-            evalInContext(this.scripts, this);
+          if (!isFunction(this.scripts)) {
+            throw new Error('script must be a function');
           }
+
+          this.scripts.bind(this).call(this, this.options, this);
 
           listenate(this, function (key, value, o) {
             return !isFunction(value) && !_this3.unlistenatedProperties.includes(key);
@@ -586,18 +586,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     });
   }
 
-  // @see http://stackoverflow.com/questions/8403108/calling-eval-in-particular-context
-  function evalInContext(js, context) {
-    /* eslint-disable no-eval */
-    return function () {
-      /* eslint-disable no-unused-vars */
-      var self = context;
-      /* eslint-enable no-unused-vars */
-      return eval(js);
-    }.call(context);
-    /* eslint-enable no-eval */
-  }
-
   var decorateEventable = function decorateEventable(scope, eventName, listener) {
     return function (event) {
       try {
@@ -666,23 +654,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     me.tickContext.clear();
   };
 
-  var scriptsSelector = 'script[type="text/waitron"]';
-  var scriptRegex = /<initialize>([\s\S]*)<\/initialize>/;
-  var templateRegex = /<template>([\s\S]*)<\/template>/;
-  function extractRegex(regex, text) {
-    var m = regex.exec(text);
-    return m[1]; // TODO:join?
-  }
-
   var ComponentType = function () {
     _createClass(ComponentType, null, [{
-      key: 'createFromScript',
-      value: function createFromScript(shadows) {
-        var scripts = extractRegex(scriptRegex, shadows);
-        var templates = extractRegex(templateRegex, shadows);
-        return new ComponentType(scripts, templates);
-      }
-    }, {
       key: 'find',
       value: function find(name) {
         return ComponentType.list[name];
@@ -747,19 +720,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }();
 
   ComponentType.list = {};
-
-  me.initFromScript = function (scriptEl) {
-    var shadows = $(scriptEl).text();
-    return ComponentType.createFromScript(shadows);
-  };
-
-  me.init = function () {
-    $(scriptsSelector).each(function () {
-      var componentType = me.initFromScript(this);
-
-      componentType.createAfter(this);
-    });
-  };
 
   me.import = function (el, handler) {
     return new ComponentType(handler, el);

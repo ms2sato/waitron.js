@@ -183,11 +183,11 @@
         this.unlistenatedProperties = [] // for includes unlistenatedProperties
         this.unlistenatedProperties = Object.getOwnPropertyNames(this)
 
-        if (isFunction(this.scripts)) {
-          this.scripts.bind(this).call(this, this.options, this)
-        } else {
-          evalInContext(this.scripts, this)
+        if (!isFunction(this.scripts)) {
+          throw new Error('script must be a function')
         }
+
+        this.scripts.bind(this).call(this, this.options, this)
 
         listenate(this, (key, value, o) => {
           return !isFunction(value) && !this.unlistenatedProperties.includes(key)
@@ -426,18 +426,6 @@
     })
   }
 
-  // @see http://stackoverflow.com/questions/8403108/calling-eval-in-particular-context
-  function evalInContext (js, context) {
-    /* eslint-disable no-eval */
-    return function () {
-      /* eslint-disable no-unused-vars */
-      const self = context
-      /* eslint-enable no-unused-vars */
-      return eval(js)
-    }.call(context)
-    /* eslint-enable no-eval */
-  }
-
   var decorateEventable = (scope, eventName, listener) => event => {
     try {
       me.onBeforeEvent(scope, eventName, event, listener)
@@ -494,21 +482,7 @@
     me.tickContext.clear()
   }
 
-  const scriptsSelector = 'script[type="text/waitron"]'
-  const scriptRegex = /<initialize>([\s\S]*)<\/initialize>/
-  const templateRegex = /<template>([\s\S]*)<\/template>/
-  function extractRegex (regex, text) {
-    const m = regex.exec(text)
-    return m[1] // TODO:join?
-  }
-
   class ComponentType {
-    static createFromScript (shadows) {
-      const scripts = extractRegex(scriptRegex, shadows)
-      const templates = extractRegex(templateRegex, shadows)
-      return new ComponentType(scripts, templates)
-    }
-
     static find (name) { return ComponentType.list[name] }
 
     constructor (scripts, templates, name) {
@@ -555,19 +529,6 @@
   }
 
   ComponentType.list = {}
-
-  me.initFromScript = scriptEl => {
-    const shadows = $(scriptEl).text()
-    return ComponentType.createFromScript(shadows)
-  }
-
-  me.init = () => {
-    $(scriptsSelector).each(function () {
-      const componentType = me.initFromScript(this)
-
-      componentType.createAfter(this)
-    })
-  }
 
   me.import = (el, handler) => new ComponentType(handler, el)
 
