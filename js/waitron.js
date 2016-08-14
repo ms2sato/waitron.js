@@ -27,8 +27,18 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     console.log.apply(console, arguments);
   }
 
+  // @see http://qiita.com/Layzie/items/465e715dae14e2f601de
+  function is(type, obj) {
+    var clas = Object.prototype.toString.call(obj).slice(8, -1);
+    return obj !== undefined && obj !== null && clas === type;
+  }
+
+  function isString(o) {
+    return is('String', o);
+  }
+
   function isFunction(o) {
-    return typeof o === 'function';
+    return is('Function', o);
   }
 
   function _each(o, func) {
@@ -666,8 +676,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       _classCallCheck(this, ComponentType);
 
       this.scripts = scripts;
-
-      if ($.type(templates) === 'string') {
+      if (isString(templates)) {
         this.templates = templates;
         this.name = name;
       } else {
