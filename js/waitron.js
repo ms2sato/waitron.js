@@ -398,7 +398,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
                   if (typeName) {
                     (function () {
                       $itemEl.removeAttr('w:type');
-                      var component = ComponentType.find(typeName);
+                      var component = Component.find(typeName);
                       list.each(function (item, index) {
                         var templates = $itemEl.clone();
                         templates.append($(component.templates).clone());
@@ -664,16 +664,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     me.tickContext.clear();
   };
 
-  var ComponentType = function () {
-    _createClass(ComponentType, null, [{
+  var Component = function () {
+    _createClass(Component, null, [{
       key: 'find',
       value: function find(name) {
-        return ComponentType.list[name];
+        return Component.list[name];
       }
     }]);
 
-    function ComponentType(scripts, templates, name) {
-      _classCallCheck(this, ComponentType);
+    function Component(scripts, templates, name) {
+      _classCallCheck(this, Component);
 
       this.scripts = scripts;
       if (isString(templates)) {
@@ -684,10 +684,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         this.name = name || $(templates).attr('id');
       }
 
-      ComponentType.list[this.name] = this;
+      Component.list[this.name] = this;
     }
 
-    _createClass(ComponentType, [{
+    _createClass(Component, [{
       key: 'mixTo',
       value: function mixTo() {
         var el = arguments.length <= 0 || arguments[0] === undefined ? document.createElement('div') : arguments[0];
@@ -725,17 +725,17 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       }
     }]);
 
-    return ComponentType;
+    return Component;
   }();
 
-  ComponentType.list = {};
+  Component.list = {};
 
-  me.import = function (el, handler) {
-    return new ComponentType(handler, el);
+  me.define = function (el, handler) {
+    return new Component(handler, el);
   };
 
   me.find = function (name) {
-    return ComponentType.find(name);
+    return Component.find(name);
   };
 
   me.onBeforeEvent(null, 'bootstrap', null, null);

@@ -31,9 +31,9 @@
       </form>
     </template>
     <script>
-      w.import(titleBind, function (options) {
+      w.define(titleBind, function (options) {
         this.title = options.title || "テスト"
-        this.subtitle = options.subtitle || new Date
+        this.subtitle = options.subtitle || (this.title + new Date)
 
         this.h1Clicked = (e) => {
           this.title = "ああああ"
@@ -50,7 +50,7 @@
     </script>
 
     <script>
-      var type = w.import(strList, function(options){
+      var type = w.define(strList, function(options){
         this.items = w([1,2,3])
         this.on('rendered',  () => {
           this.items.insert(2, 4)
@@ -65,7 +65,7 @@
 
 
     <script>
-      var type = w.import(titleList, function(options){
+      var type = w.define(titleList, function(options){
         this.items = w([
           {title: 'オプション'},
           {title: 'タイトル2', subtitle: 'sub'}

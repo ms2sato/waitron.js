@@ -301,7 +301,7 @@
             const typeName = $itemEl.attr('w:type')
             if (typeName) {
               $itemEl.removeAttr('w:type')
-              const component = ComponentType.find(typeName)
+              const component = Component.find(typeName)
               list.each((item, index) => {
                 const templates = $itemEl.clone()
                 templates.append($(component.templates).clone())
@@ -492,8 +492,8 @@
     me.tickContext.clear()
   }
 
-  class ComponentType {
-    static find (name) { return ComponentType.list[name] }
+  class Component {
+    static find (name) { return Component.list[name] }
 
     constructor (scripts, templates, name) {
       this.scripts = scripts
@@ -505,7 +505,7 @@
         this.name = name || $(templates).attr('id')
       }
 
-      ComponentType.list[this.name] = this
+      Component.list[this.name] = this
     }
 
     mixTo (el = document.createElement('div'), options = {}) {
@@ -537,11 +537,11 @@
     }
   }
 
-  ComponentType.list = {}
+  Component.list = {}
 
-  me.import = (el, handler) => new ComponentType(handler, el)
+  me.define = (el, handler) => new Component(handler, el)
 
-  me.find = name => ComponentType.find(name)
+  me.find = name => Component.find(name)
 
   me.onBeforeEvent(null, 'bootstrap', null, null)
   // something on boot?
