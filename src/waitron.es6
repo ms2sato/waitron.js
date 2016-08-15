@@ -80,6 +80,10 @@
     }
   }
 
+  me.options = {
+    prefix: 'w'
+  }
+
   const identify = (() => {
     let id_counter = 1
     return function identify (o) {
@@ -166,7 +170,29 @@
   }
 
   const scopeRegex = /\{([\s\S]*)\}/
-  function getChangeEventName (prop) { return `change:${prop}` }
+
+  const EK = (() => {
+    class EventKeys {
+      change (prop) { return `change:${prop}` }
+      get rendered () { return 'rendered' }
+      get inserted () { return 'inserted' }
+      get tick () { return 'tick' }
+    }
+    return new EventKeys()
+  })()
+
+  const originalAttributes = ['id', 'type', 'list']
+  const OA = (() => {
+    const OA = {}
+    each(originalAttributes, function (value) {
+      Object.defineProperty(OA, value, {
+        get () { return `${me.options.prefix}:${value}` },
+        enumerable: true,
+        configurable: false
+      })
+    })
+    return OA
+  })()
 
   const Scope = (() => {
     function addEventListener (scope, eventName, listener, el = scope.el) {
@@ -197,7 +223,7 @@
           throw new Error('script must be a function')
         }
 
-        this.scripts.bind(this).call(this, this.options, this)
+        this.scripts(this.options, this)
 
         listenate(this, (key, value, o) => {
           return !isFunction(value) && !this.unlistenatedProperties.includes(key)
@@ -216,7 +242,7 @@
         me.nextTick(() => {
           me.onBeforeRender.call(self)
           this.doRender()
-          this.trigger('rendered')
+          this.trigger(EK.rendered)
           me.onAfterRender.call(self)
         })
       }
@@ -244,7 +270,7 @@
         const m = scopeRegex.exec(text)
         if (m) {
           const prop = m[1]
-          self.on(getChangeEventName(prop), (e) => {
+          self.on(EK.change(prop), (e) => {
             $el.text(self[prop])
           })
           $el.text(self[prop])
@@ -276,7 +302,7 @@
             self[key] = $el.val()
           }, this)
 
-          self.on(getChangeEventName(key), () => {
+          self.on(EK.change(key), () => {
             $el.val(self[key])
           })
         })
@@ -293,14 +319,14 @@
               this[key](e)
             }, el)
             $(el).removeAttr(name)
-          } else if (name === 'w:list') {
+          } else if (name === OA.list) {
             const list = this[key]
             const $itemEl = $($el.children())
             $itemEl.remove()
 
-            const typeName = $itemEl.attr('w:type')
+            const typeName = $itemEl.attr(OA.type)
             if (typeName) {
-              $itemEl.removeAttr('w:type')
+              $itemEl.removeAttr(OA.type)
               const component = Component.find(typeName)
               list.each((item, index) => {
                 const templates = $itemEl.clone()
@@ -331,11 +357,11 @@
                 creator(item, index)
               })
 
-              list.on('inserted', (index) => {
+              list.on(EK.inserted, (index) => {
                 creator(list.at(index), index)
               })
             }
-            $el.removeAttr('w:list')
+            $el.removeAttr(OA.list)
             return
           }
         }
@@ -360,7 +386,7 @@
     }
 
     doSetId () {
-      $(this.template).attr('w:id', this.id)
+      $(this.template).attr(OA.id, this.id)
     }
   }
 
@@ -390,17 +416,17 @@
     }
 
     doSetId () {
-      $(this.el).attr('w:id', this.id)
+      $(this.el).attr(OA.id, this.id)
     }
   }
 
   if (global.setImmediate) {
     me.nextTick = func => {
-      global.setImmediate(decorateEventable(null, 'tick', func))
+      global.setImmediate(decorateEventable(null, EK.tick, func))
     }
   } else {
     me.nextTick = func => {
-      global.setTimeout(decorateEventable(null, 'tick', func), 0)
+      global.setTimeout(decorateEventable(null, EK.tick, func), 0)
     }
   }
 
@@ -422,17 +448,17 @@
   function onAfterPropertyChange (o, prop, value, oldValue) {
     log('onAfterPropertyChange', arguments)
 
-    me.tickContext.push(`${o.id}@${prop}`, () => {
-      log(`triggered ${getChangeEventName(prop)}`)
-      o.trigger(getChangeEventName(prop))
+    me.tickContext.push(`${o.id}@${EK.change(prop)}`, () => {
+      log(`triggered ${EK.change(prop)}`)
+      o.trigger(EK.change(prop))
     })
   }
 
   function onCollectionInserted (c, index, value) {
     log('onCollectionInserted', arguments)
 
-    me.tickContext.push(`${c.id}@inserted`, () => {
-      c.trigger('inserted', index, value)
+    me.tickContext.push(`${c.id}@${EK.inserted}`, () => {
+      c.trigger(EK.inserted, index, value)
     })
   }
 
@@ -542,10 +568,6 @@
   me.define = (el, handler) => new Component(handler, el)
 
   me.find = name => Component.find(name)
-
-  me.onBeforeEvent(null, 'bootstrap', null, null)
-  // something on boot?
-  me.onAfterEvent(null, 'bootstrap', null, null)
 
   me.Observer = Observer
   me.Collection = Collection

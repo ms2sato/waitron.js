@@ -107,6 +107,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }
   };
 
+  me.options = {
+    prefix: 'w'
+  };
+
   var identify = function () {
     var id_counter = 1;
     return function identify(o) {
@@ -235,9 +239,56 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }
 
   var scopeRegex = /\{([\s\S]*)\}/;
-  function getChangeEventName(prop) {
-    return 'change:' + prop;
-  }
+
+  var EK = function () {
+    var EventKeys = function () {
+      function EventKeys() {
+        _classCallCheck(this, EventKeys);
+      }
+
+      _createClass(EventKeys, [{
+        key: 'change',
+        value: function change(prop) {
+          return 'change:' + prop;
+        }
+      }, {
+        key: 'rendered',
+        get: function get() {
+          return 'rendered';
+        }
+      }, {
+        key: 'inserted',
+        get: function get() {
+          return 'inserted';
+        }
+      }, {
+        key: 'tick',
+        get: function get() {
+          return 'tick';
+        }
+      }]);
+
+      return EventKeys;
+    }();
+
+    return new EventKeys();
+  }();
+
+  var originalAttributes = ['id', 'type', 'list'];
+  var OA = function () {
+    var OA = {};
+    _each(originalAttributes, function (value) {
+      Object.defineProperty(OA, value, {
+        get: function get() {
+          return me.options.prefix + ':' + value;
+        },
+
+        enumerable: true,
+        configurable: false
+      });
+    });
+    return OA;
+  }();
 
   var Scope = function () {
     function addEventListener(scope, eventName, listener) {
@@ -276,7 +327,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             throw new Error('script must be a function');
           }
 
-          this.scripts.bind(this).call(this, this.options, this);
+          this.scripts(this.options, this);
 
           listenate(this, function (key, value, o) {
             return !isFunction(value) && !_this3.unlistenatedProperties.includes(key);
@@ -298,7 +349,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           me.nextTick(function () {
             me.onBeforeRender.call(self);
             _this4.doRender();
-            _this4.trigger('rendered');
+            _this4.trigger(EK.rendered);
             me.onAfterRender.call(self);
           });
         }
@@ -333,7 +384,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           if (m) {
             (function () {
               var prop = m[1];
-              self.on(getChangeEventName(prop), function (e) {
+              self.on(EK.change(prop), function (e) {
                 $el.text(self[prop]);
               });
               $el.text(self[prop]);
@@ -367,7 +418,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
               self[key] = $el.val();
             }, this);
 
-            self.on(getChangeEventName(key), function () {
+            self.on(EK.change(key), function () {
               $el.val(self[key]);
             });
           });
@@ -388,16 +439,16 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
                   _this6[key](e);
                 }, el);
                 $(el).removeAttr(name);
-              } else if (name === 'w:list') {
+              } else if (name === OA.list) {
                 var _ret3 = function () {
                   var list = _this6[key];
                   var $itemEl = $($el.children());
                   $itemEl.remove();
 
-                  var typeName = $itemEl.attr('w:type');
+                  var typeName = $itemEl.attr(OA.type);
                   if (typeName) {
                     (function () {
-                      $itemEl.removeAttr('w:type');
+                      $itemEl.removeAttr(OA.type);
                       var component = Component.find(typeName);
                       list.each(function (item, index) {
                         var templates = $itemEl.clone();
@@ -432,12 +483,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
                         creator(item, index);
                       });
 
-                      list.on('inserted', function (index) {
+                      list.on(EK.inserted, function (index) {
                         creator(list.at(index), index);
                       });
                     })();
                   }
-                  $el.removeAttr('w:list');
+                  $el.removeAttr(OA.list);
                   return {
                     v: {
                       v: void 0
@@ -490,7 +541,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'doSetId',
       value: function doSetId() {
-        $(this.template).attr('w:id', this.id);
+        $(this.template).attr(OA.id, this.id);
       }
     }]);
 
@@ -547,7 +598,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'doSetId',
       value: function doSetId() {
-        $(this.el).attr('w:id', this.id);
+        $(this.el).attr(OA.id, this.id);
       }
     }]);
 
@@ -556,11 +607,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
   if (global.setImmediate) {
     me.nextTick = function (func) {
-      global.setImmediate(decorateEventable(null, 'tick', func));
+      global.setImmediate(decorateEventable(null, EK.tick, func));
     };
   } else {
     me.nextTick = function (func) {
-      global.setTimeout(decorateEventable(null, 'tick', func), 0);
+      global.setTimeout(decorateEventable(null, EK.tick, func), 0);
     };
   }
 
@@ -582,17 +633,17 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   function onAfterPropertyChange(o, prop, value, oldValue) {
     log('onAfterPropertyChange', arguments);
 
-    me.tickContext.push(o.id + '@' + prop, function () {
-      log('triggered ' + getChangeEventName(prop));
-      o.trigger(getChangeEventName(prop));
+    me.tickContext.push(o.id + '@' + EK.change(prop), function () {
+      log('triggered ' + EK.change(prop));
+      o.trigger(EK.change(prop));
     });
   }
 
   function onCollectionInserted(c, index, value) {
     log('onCollectionInserted', arguments);
 
-    me.tickContext.push(c.id + '@inserted', function () {
-      c.trigger('inserted', index, value);
+    me.tickContext.push(c.id + '@' + EK.inserted, function () {
+      c.trigger(EK.inserted, index, value);
     });
   }
 
@@ -737,10 +788,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   me.find = function (name) {
     return Component.find(name);
   };
-
-  me.onBeforeEvent(null, 'bootstrap', null, null);
-  // something on boot?
-  me.onAfterEvent(null, 'bootstrap', null, null);
 
   me.Observer = Observer;
   me.Collection = Collection;
