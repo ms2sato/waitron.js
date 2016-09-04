@@ -124,7 +124,7 @@
         params.push(models)
       }
       this.models.splice.apply(this.models, params)
-      onCollectionInserted(this, index, models)
+      me.aspect.onCollectionInserted(this, index, models)
     }
 
     move () {}
@@ -147,9 +147,9 @@
       get () { return value },
       set (newValue) {
         const oldValue = value
-        onBeforePropertyChange(o, prop, value, newValue)
+        me.aspect.onBeforePropertyChange(o, prop, value, newValue)
         value = newValue
-        onAfterPropertyChange(o, prop, value, oldValue)
+        me.aspect.onAfterPropertyChange(o, prop, value, oldValue)
       },
       enumerable: true,
       configurable: true
@@ -433,33 +433,35 @@
   me.onBeforeRender = () => {}
   me.onAfterRender = function () {}
 
-  function onNewProperty (o, prop, newValue) {
-    log('onNewProperty', arguments)
-  }
+  me.aspect = {
+    onNewProperty (o, prop, newValue) {
+      log('onNewProperty', arguments)
+    },
 
-  function onBeforePropertyChange (o, prop, value, newValue) {
-    if (!(prop in o)) {
-      onNewProperty(o, prop, newValue)
+    onBeforePropertyChange (o, prop, value, newValue) {
+      if (!(prop in o)) {
+        this.onNewProperty(o, prop, newValue)
+      }
+
+      log('onBeforePropertyChange', arguments)
+    },
+
+    onAfterPropertyChange (o, prop, value, oldValue) {
+      log('onAfterPropertyChange', arguments)
+
+      me.tickContext.push(`${o.id}@${EK.change(prop)}`, () => {
+        log(`triggered ${EK.change(prop)}`)
+        o.trigger(EK.change(prop))
+      })
+    },
+
+    onCollectionInserted (c, index, value) {
+      log('onCollectionInserted', arguments)
+
+      me.tickContext.push(`${c.id}@${EK.inserted}`, () => {
+        c.trigger(EK.inserted, index, value)
+      })
     }
-
-    log('onBeforePropertyChange', arguments)
-  }
-
-  function onAfterPropertyChange (o, prop, value, oldValue) {
-    log('onAfterPropertyChange', arguments)
-
-    me.tickContext.push(`${o.id}@${EK.change(prop)}`, () => {
-      log(`triggered ${EK.change(prop)}`)
-      o.trigger(EK.change(prop))
-    })
-  }
-
-  function onCollectionInserted (c, index, value) {
-    log('onCollectionInserted', arguments)
-
-    me.tickContext.push(`${c.id}@${EK.inserted}`, () => {
-      c.trigger(EK.inserted, index, value)
-    })
   }
 
   const decorateEventable = (scope, eventName, listener) => event => {

@@ -170,7 +170,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           params.push(models);
         }
         this.models.splice.apply(this.models, params);
-        onCollectionInserted(this, index, models);
+        me.aspect.onCollectionInserted(this, index, models);
       }
     }, {
       key: 'move',
@@ -211,9 +211,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       },
       set: function set(newValue) {
         var oldValue = value;
-        onBeforePropertyChange(o, prop, value, newValue);
+        me.aspect.onBeforePropertyChange(o, prop, value, newValue);
         value = newValue;
-        onAfterPropertyChange(o, prop, value, oldValue);
+        me.aspect.onAfterPropertyChange(o, prop, value, oldValue);
       },
 
       enumerable: true,
@@ -618,34 +618,33 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   me.onBeforeRender = function () {};
   me.onAfterRender = function () {};
 
-  function onNewProperty(o, prop, newValue) {
-    log('onNewProperty', arguments);
-  }
+  me.aspect = {
+    onNewProperty: function onNewProperty(o, prop, newValue) {
+      log('onNewProperty', arguments);
+    },
+    onBeforePropertyChange: function onBeforePropertyChange(o, prop, value, newValue) {
+      if (!(prop in o)) {
+        this.onNewProperty(o, prop, newValue);
+      }
 
-  function onBeforePropertyChange(o, prop, value, newValue) {
-    if (!(prop in o)) {
-      onNewProperty(o, prop, newValue);
+      log('onBeforePropertyChange', arguments);
+    },
+    onAfterPropertyChange: function onAfterPropertyChange(o, prop, value, oldValue) {
+      log('onAfterPropertyChange', arguments);
+
+      me.tickContext.push(o.id + '@' + EK.change(prop), function () {
+        log('triggered ' + EK.change(prop));
+        o.trigger(EK.change(prop));
+      });
+    },
+    onCollectionInserted: function onCollectionInserted(c, index, value) {
+      log('onCollectionInserted', arguments);
+
+      me.tickContext.push(c.id + '@' + EK.inserted, function () {
+        c.trigger(EK.inserted, index, value);
+      });
     }
-
-    log('onBeforePropertyChange', arguments);
-  }
-
-  function onAfterPropertyChange(o, prop, value, oldValue) {
-    log('onAfterPropertyChange', arguments);
-
-    me.tickContext.push(o.id + '@' + EK.change(prop), function () {
-      log('triggered ' + EK.change(prop));
-      o.trigger(EK.change(prop));
-    });
-  }
-
-  function onCollectionInserted(c, index, value) {
-    log('onCollectionInserted', arguments);
-
-    me.tickContext.push(c.id + '@' + EK.inserted, function () {
-      c.trigger(EK.inserted, index, value);
-    });
-  }
+  };
 
   var decorateEventable = function decorateEventable(scope, eventName, listener) {
     return function (event) {
