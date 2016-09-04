@@ -27,80 +27,107 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     console.log.apply(console, arguments);
   }
 
-  // @see http://qiita.com/Layzie/items/465e715dae14e2f601de
-  function is(type, obj) {
-    var clas = Object.prototype.toString.call(obj).slice(8, -1);
-    return obj !== undefined && obj !== null && clas === type;
-  }
+  var util = function (util) {
+    // @see http://qiita.com/Layzie/items/465e715dae14e2f601de
+    function is(type, obj) {
+      var clas = Object.prototype.toString.call(obj).slice(8, -1);
+      return obj !== undefined && obj !== null && clas === type;
+    }
 
-  function isString(o) {
-    return is('String', o);
-  }
+    util.isString = function (o) {
+      return is('String', o);
+    };
 
-  function isFunction(o) {
-    return is('Function', o);
-  }
+    util.isFunction = function (o) {
+      return is('Function', o);
+    };
 
-  function _each(o, func) {
-    if (Array.isArray(o)) {
-      for (var i = 0; i < o.length; ++i) {
-        func.call(o, o[i], i);
+    util.each = function (o, func) {
+      if (Array.isArray(o)) {
+        for (var i = 0; i < o.length; ++i) {
+          func.call(o, o[i], i);
+        }
+        return o;
+      }
+
+      for (var key in o) {
+        if (o.hasOwnProperty(key)) func.call(o, o[key], key);
       }
       return o;
-    }
-
-    for (var key in o) {
-      if (o.hasOwnProperty(key)) func.call(o, o[key], key);
-    }
-    return o;
-  }
-
-  function delegate(prototype, to, name) {
-    if (Array.isArray(name)) {
-      return _each(name, function (n) {
-        delegate(prototype, to, n);
-      });
-    }
-
-    prototype[name] = function () {
-      this[to][name].apply(this[to], arguments);
     };
-  }
 
-  var Observer = function () {
-    function Observer() {
-      _classCallCheck(this, Observer);
-
-      this.listenersHash = {};
-    }
-
-    _createClass(Observer, [{
-      key: 'on',
-      value: function on(name, listener) {
-        if (!this.listenersHash[name]) {
-          this.listenersHash[name] = [];
-        }
-        this.listenersHash[name].push(listener);
-      }
-    }, {
-      key: 'trigger',
-      value: function trigger() {
-        var _this = this,
-            _arguments = arguments;
-
-        var name = Array.prototype.shift.call(arguments);
-        _each(this.listenersHash[name], function (listener) {
-          listener.apply(_this, _arguments);
+    util.delegate = function (prototype, to, name) {
+      if (Array.isArray(name)) {
+        return util.each(name, function (n) {
+          util.delegate(prototype, to, n);
         });
       }
-    }]);
 
-    return Observer;
-  }();
+      prototype[name] = function () {
+        this[to][name].apply(this[to], arguments);
+      };
+    };
+
+    var Observer = function () {
+      function Observer() {
+        _classCallCheck(this, Observer);
+
+        this.listenersHash = {};
+      }
+
+      _createClass(Observer, [{
+        key: 'on',
+        value: function on(name, listener) {
+          if (!this.listenersHash[name]) {
+            this.listenersHash[name] = [];
+          }
+          this.listenersHash[name].push(listener);
+        }
+      }, {
+        key: 'trigger',
+        value: function trigger() {
+          var _this = this,
+              _arguments = arguments;
+
+          var name = Array.prototype.shift.call(arguments);
+          util.each(this.listenersHash[name], function (listener) {
+            listener.apply(_this, _arguments);
+          });
+        }
+      }]);
+
+      return Observer;
+    }();
+
+    util.createIdentify = function () {
+      var prop = arguments.length <= 0 || arguments[0] === undefined ? 'id' : arguments[0];
+      var internalProp = arguments.length <= 1 || arguments[1] === undefined ? '__uniqueId' : arguments[1];
+
+      var id_counter = 1;
+      return function identify(o) {
+        if (o.__uniqueId === undefined) {
+          // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
+          Object.defineProperty(o, internalProp, {
+            writable: true
+          });
+
+          o[internalProp] = id_counter++;
+
+          Object.defineProperty(o, prop, {
+            get: function get() {
+              return this[internalProp];
+            }
+          });
+        }
+      };
+    };
+
+    util.Observer = Observer;
+
+    return util;
+  }({});
 
   // me ////////////////////////////////////////////////
-
-
   var me = function waitron(obj) {
     if (Array.isArray(obj)) {
       return new Collection(obj);
@@ -111,28 +138,36 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     prefix: 'w'
   };
 
-  var identify = function () {
-    var id_counter = 1;
-    return function identify(o) {
-      if (o.__uniqueId === undefined) {
-        // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
-        Object.defineProperty(o, '__uniqueId', {
-          writable: true
-        });
-
-        o.__uniqueId = id_counter++;
-
-        Object.defineProperty(o, 'id', {
-          get: function get() {
-            return this.__uniqueId;
-          }
-        });
+  me.aspect = {
+    onNewProperty: function onNewProperty(o, prop, newValue) {
+      log('onNewProperty', arguments);
+    },
+    onBeforePropertyChange: function onBeforePropertyChange(o, prop, value, newValue) {
+      if (!(prop in o)) {
+        this.onNewProperty(o, prop, newValue);
       }
-    };
-  }();
 
-  var Collection = function (_Observer) {
-    _inherits(Collection, _Observer);
+      log('onBeforePropertyChange', arguments);
+    },
+    onAfterPropertyChange: function onAfterPropertyChange(o, prop, value, oldValue) {
+      log('onAfterPropertyChange', arguments);
+
+      me.tickContext.push(o.id + '@' + EK.change(prop), function () {
+        log('triggered ' + EK.change(prop));
+        o.trigger(EK.change(prop));
+      });
+    },
+    onCollectionInserted: function onCollectionInserted(c, index, value) {
+      log('onCollectionInserted', arguments);
+
+      me.tickContext.push(c.id + '@' + EK.inserted, function () {
+        c.trigger(EK.inserted, index, value);
+      });
+    }
+  };
+
+  var Collection = function (_util$Observer) {
+    _inherits(Collection, _util$Observer);
 
     function Collection(models) {
       _classCallCheck(this, Collection);
@@ -193,15 +228,12 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     }, {
       key: 'each',
       value: function each(handler) {
-        _each(this.models, handler);
+        util.each(this.models, handler);
       }
     }]);
 
     return Collection;
-  }(Observer);
-
-  // scope ////////////////////////////////////////////////
-
+  }(util.Observer);
 
   function listenateProp(o, prop) {
     var value = o[prop];
@@ -227,7 +259,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     } : arguments[1];
 
     var ret = [];
-    _each(o, function (value, key) {
+    util.each(o, function (value, key) {
       if (!checker(key, value, o)) return;
 
       log('lisnated: ' + key);
@@ -238,8 +270,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return ret;
   }
 
-  var scopeRegex = /\{([\s\S]*)\}/;
-
+  // scope ////////////////////////////////////////////////
   var EK = function () {
     var EventKeys = function () {
       function EventKeys() {
@@ -277,7 +308,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   var originalAttributes = ['id', 'type', 'list'];
   var OA = function () {
     var OA = {};
-    _each(originalAttributes, function (value) {
+    util.each(originalAttributes, function (value) {
       Object.defineProperty(OA, value, {
         get: function get() {
           return me.options.prefix + ':' + value;
@@ -291,6 +322,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
   }();
 
   var Scope = function () {
+    var scopeRegex = /\{([\s\S]+)\}/;
+
     function addEventListener(scope, eventName, listener) {
       var el = arguments.length <= 3 || arguments[3] === undefined ? scope.el : arguments[3];
 
@@ -302,6 +335,8 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       }
     }
 
+    var identify = util.createIdentify();
+
     var Scope = function () {
       function Scope(params) {
         _classCallCheck(this, Scope);
@@ -310,7 +345,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
         this.templates = params.templates;
         this.scripts = params.scripts;
         this.options = params.options;
-        this.observer = new Observer();
+        this.observer = new util.Observer();
 
         identify(this);
       }
@@ -323,14 +358,14 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
           this.unlistenatedProperties = []; // for includes unlistenatedProperties
           this.unlistenatedProperties = Object.getOwnPropertyNames(this);
 
-          if (!isFunction(this.scripts)) {
+          if (!util.isFunction(this.scripts)) {
             throw new Error('script must be a function');
           }
 
           this.scripts(this.options, this);
 
           listenate(this, function (key, value, o) {
-            return !isFunction(value) && !_this3.unlistenatedProperties.includes(key);
+            return !util.isFunction(value) && !_this3.unlistenatedProperties.includes(key);
           });
 
           this.template = $(this.templates);
@@ -362,9 +397,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       }, {
         key: 'prop',
         value: function prop(key) {
-          var p = this[key];
-          if (isFunction(p)) return p();
-          return p;
+          return this[key];
         }
 
         // private
@@ -391,7 +424,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
             })();
           }
 
-          _each(el.attributes, function (val, key) {
+          util.each(el.attributes, function (val, key) {
             _this5.scanAttr(el, key, val);
           });
 
@@ -517,7 +550,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       return Scope;
     }();
 
-    delegate(Scope.prototype, 'observer', ['on', 'trigger']);
+    util.delegate(Scope.prototype, 'observer', ['on', 'trigger']);
 
     return Scope;
   }();
@@ -615,37 +648,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     };
   }
 
-  me.onBeforeRender = function () {};
-  me.onAfterRender = function () {};
-
-  me.aspect = {
-    onNewProperty: function onNewProperty(o, prop, newValue) {
-      log('onNewProperty', arguments);
-    },
-    onBeforePropertyChange: function onBeforePropertyChange(o, prop, value, newValue) {
-      if (!(prop in o)) {
-        this.onNewProperty(o, prop, newValue);
-      }
-
-      log('onBeforePropertyChange', arguments);
-    },
-    onAfterPropertyChange: function onAfterPropertyChange(o, prop, value, oldValue) {
-      log('onAfterPropertyChange', arguments);
-
-      me.tickContext.push(o.id + '@' + EK.change(prop), function () {
-        log('triggered ' + EK.change(prop));
-        o.trigger(EK.change(prop));
-      });
-    },
-    onCollectionInserted: function onCollectionInserted(c, index, value) {
-      log('onCollectionInserted', arguments);
-
-      me.tickContext.push(c.id + '@' + EK.inserted, function () {
-        c.trigger(EK.inserted, index, value);
-      });
-    }
-  };
-
   var decorateEventable = function decorateEventable(scope, eventName, listener) {
     return function (event) {
       try {
@@ -695,6 +697,9 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return TickContext;
   }();
 
+  me.onBeforeRender = function () {};
+  me.onAfterRender = function () {};
+
   me.onBeforeEvent = function (scope, eventName, event, listener) {
     me.tickContext = new TickContext(scope, eventName, event, listener);
   };
@@ -726,7 +731,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
       _classCallCheck(this, Component);
 
       this.scripts = scripts;
-      if (isString(templates)) {
+      if (util.isString(templates)) {
         this.templates = templates;
         this.name = name;
       } else {
@@ -788,7 +793,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
     return Component.find(name);
   };
 
-  me.Observer = Observer;
+  me.Observer = util.Observer;
   me.Collection = Collection;
   return me;
 });

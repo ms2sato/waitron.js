@@ -15,63 +15,89 @@
     console.log.apply(console, arguments)
   }
 
-  // @see http://qiita.com/Layzie/items/465e715dae14e2f601de
-  function is (type, obj) {
-    const clas = Object.prototype.toString.call(obj).slice(8, -1)
-    return obj !== undefined && obj !== null && clas === type
-  }
+  const util = (function (util) {
+    // @see http://qiita.com/Layzie/items/465e715dae14e2f601de
+    function is (type, obj) {
+      const clas = Object.prototype.toString.call(obj).slice(8, -1)
+      return obj !== undefined && obj !== null && clas === type
+    }
 
-  function isString (o) {
-    return is('String', o)
-  }
+    util.isString = function (o) {
+      return is('String', o)
+    }
 
-  function isFunction (o) {
-    return is('Function', o)
-  }
+    util.isFunction = function (o) {
+      return is('Function', o)
+    }
 
-  function each (o, func) {
-    if (Array.isArray(o)) {
-      for (let i = 0; i < o.length; ++i) { func.call(o, o[i], i) }
+    util.each = function (o, func) {
+      if (Array.isArray(o)) {
+        for (let i = 0; i < o.length; ++i) { func.call(o, o[i], i) }
+        return o
+      }
+
+      for (const key in o) {
+        if (o.hasOwnProperty(key)) func.call(o, o[key], key)
+      }
       return o
     }
 
-    for (const key in o) {
-      if (o.hasOwnProperty(key)) func.call(o, o[key], key)
-    }
-    return o
-  }
-
-  function delegate (prototype, to, name) {
-    if (Array.isArray(name)) {
-      return each(name, (n) => {
-        delegate(prototype, to, n)
-      })
-    }
-
-    prototype[name] = function () {
-      this[to][name].apply(this[to], arguments)
-    }
-  }
-
-  class Observer {
-    constructor () {
-      this.listenersHash = {}
-    }
-
-    on (name, listener) {
-      if (!this.listenersHash[name]) {
-        this.listenersHash[name] = []
+    util.delegate = function (prototype, to, name) {
+      if (Array.isArray(name)) {
+        return util.each(name, (n) => {
+          util.delegate(prototype, to, n)
+        })
       }
-      this.listenersHash[name].push(listener)
+
+      prototype[name] = function () {
+        this[to][name].apply(this[to], arguments)
+      }
     }
 
-    trigger () {
-      const name = Array.prototype.shift.call(arguments)
-      each(this.listenersHash[name], (listener) => {
-        listener.apply(this, arguments)
-      })
+    class Observer {
+      constructor () {
+        this.listenersHash = {}
+      }
+
+      on (name, listener) {
+        if (!this.listenersHash[name]) {
+          this.listenersHash[name] = []
+        }
+        this.listenersHash[name].push(listener)
+      }
+
+      trigger () {
+        const name = Array.prototype.shift.call(arguments)
+        util.each(this.listenersHash[name], (listener) => {
+          listener.apply(this, arguments)
+        })
+      }
     }
-  }
+
+    util.createIdentify = (prop = 'id', internalProp = '__uniqueId') => {
+      let id_counter = 1
+      return function identify (o) {
+        if (o.__uniqueId === undefined) {
+          // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
+          Object.defineProperty(o, internalProp, {
+            writable: true
+          })
+
+          o[internalProp] = id_counter++
+
+          Object.defineProperty(o, prop, {
+            get () {
+              return this[internalProp]
+            }
+          })
+        }
+      }
+    }
+
+    util.Observer = Observer
+
+    return util
+  })({})
 
   // me ////////////////////////////////////////////////
   const me = function waitron (obj) {
@@ -84,27 +110,38 @@
     prefix: 'w'
   }
 
-  const identify = (() => {
-    let id_counter = 1
-    return function identify (o) {
-      if (o.__uniqueId === undefined) {
-        // @see http://stackoverflow.com/questions/1997661/unique-object-identifier-in-javascript
-        Object.defineProperty(o, '__uniqueId', {
-          writable: true
-        })
+  me.aspect = {
+    onNewProperty (o, prop, newValue) {
+      log('onNewProperty', arguments)
+    },
 
-        o.__uniqueId = id_counter++
-
-        Object.defineProperty(o, 'id', {
-          get () {
-            return this.__uniqueId
-          }
-        })
+    onBeforePropertyChange (o, prop, value, newValue) {
+      if (!(prop in o)) {
+        this.onNewProperty(o, prop, newValue)
       }
-    }
-  })()
 
-  class Collection extends Observer {
+      log('onBeforePropertyChange', arguments)
+    },
+
+    onAfterPropertyChange (o, prop, value, oldValue) {
+      log('onAfterPropertyChange', arguments)
+
+      me.tickContext.push(`${o.id}@${EK.change(prop)}`, () => {
+        log(`triggered ${EK.change(prop)}`)
+        o.trigger(EK.change(prop))
+      })
+    },
+
+    onCollectionInserted (c, index, value) {
+      log('onCollectionInserted', arguments)
+
+      me.tickContext.push(`${c.id}@${EK.inserted}`, () => {
+        c.trigger(EK.inserted, index, value)
+      })
+    }
+  }
+
+  class Collection extends util.Observer {
     constructor (models) {
       super()
       this.models = models || []
@@ -136,11 +173,10 @@
     swap (lindex, rindex) {}
 
     each (handler) {
-      each(this.models, handler)
+      util.each(this.models, handler)
     }
   }
 
-  // scope ////////////////////////////////////////////////
   function listenateProp (o, prop) {
     let value = o[prop]
     Object.defineProperty(o, prop, {
@@ -158,7 +194,7 @@
 
   function listenate (o, checker = function () { return true }) {
     const ret = []
-    each(o, (value, key) => {
+    util.each(o, (value, key) => {
       if (!checker(key, value, o)) return
 
       log(`lisnated: ${key}`)
@@ -169,8 +205,7 @@
     return ret
   }
 
-  const scopeRegex = /\{([\s\S]*)\}/
-
+  // scope ////////////////////////////////////////////////
   const EK = (() => {
     class EventKeys {
       change (prop) { return `change:${prop}` }
@@ -184,7 +219,7 @@
   const originalAttributes = ['id', 'type', 'list']
   const OA = (() => {
     const OA = {}
-    each(originalAttributes, function (value) {
+    util.each(originalAttributes, function (value) {
       Object.defineProperty(OA, value, {
         get () { return `${me.options.prefix}:${value}` },
         enumerable: true,
@@ -195,6 +230,8 @@
   })()
 
   const Scope = (() => {
+    const scopeRegex = /\{([\s\S]+)\}/
+
     function addEventListener (scope, eventName, listener, el = scope.el) {
       if (el.addEventListener) {
         return el.addEventListener(eventName, decorateEventable(scope, eventName, listener), true)
@@ -204,13 +241,15 @@
       }
     }
 
+    const identify = util.createIdentify()
+
     class Scope {
       constructor (params) {
         this.el = params.el
         this.templates = params.templates
         this.scripts = params.scripts
         this.options = params.options
-        this.observer = new Observer()
+        this.observer = new util.Observer()
 
         identify(this)
       }
@@ -219,14 +258,14 @@
         this.unlistenatedProperties = [] // for includes unlistenatedProperties
         this.unlistenatedProperties = Object.getOwnPropertyNames(this)
 
-        if (!isFunction(this.scripts)) {
+        if (!util.isFunction(this.scripts)) {
           throw new Error('script must be a function')
         }
 
         this.scripts(this.options, this)
 
         listenate(this, (key, value, o) => {
-          return !isFunction(value) && !this.unlistenatedProperties.includes(key)
+          return !util.isFunction(value) && !this.unlistenatedProperties.includes(key)
         })
 
         this.template = $(this.templates)
@@ -253,9 +292,7 @@
       }
 
       prop (key) {
-        const p = this[key]
-        if (isFunction(p)) return p()
-        return p
+        return this[key]
       }
 
       // private
@@ -276,7 +313,7 @@
           $el.text(self[prop])
         }
 
-        each(el.attributes, (val, key) => {
+        util.each(el.attributes, (val, key) => {
           this.scanAttr(el, key, val)
         })
 
@@ -374,7 +411,7 @@
       }
     }
 
-    delegate(Scope.prototype, 'observer', ['on', 'trigger'])
+    util.delegate(Scope.prototype, 'observer', ['on', 'trigger'])
 
     return Scope
   })()
@@ -430,40 +467,6 @@
     }
   }
 
-  me.onBeforeRender = () => {}
-  me.onAfterRender = function () {}
-
-  me.aspect = {
-    onNewProperty (o, prop, newValue) {
-      log('onNewProperty', arguments)
-    },
-
-    onBeforePropertyChange (o, prop, value, newValue) {
-      if (!(prop in o)) {
-        this.onNewProperty(o, prop, newValue)
-      }
-
-      log('onBeforePropertyChange', arguments)
-    },
-
-    onAfterPropertyChange (o, prop, value, oldValue) {
-      log('onAfterPropertyChange', arguments)
-
-      me.tickContext.push(`${o.id}@${EK.change(prop)}`, () => {
-        log(`triggered ${EK.change(prop)}`)
-        o.trigger(EK.change(prop))
-      })
-    },
-
-    onCollectionInserted (c, index, value) {
-      log('onCollectionInserted', arguments)
-
-      me.tickContext.push(`${c.id}@${EK.inserted}`, () => {
-        c.trigger(EK.inserted, index, value)
-      })
-    }
-  }
-
   const decorateEventable = (scope, eventName, listener) => event => {
     try {
       me.onBeforeEvent(scope, eventName, event, listener)
@@ -501,6 +504,9 @@
     }
   }
 
+  me.onBeforeRender = () => {}
+  me.onAfterRender = () => {}
+
   me.onBeforeEvent = (scope, eventName, event, listener) => {
     me.tickContext = new TickContext(scope, eventName, event, listener)
   }
@@ -525,7 +531,7 @@
 
     constructor (scripts, templates, name) {
       this.scripts = scripts
-      if (isString(templates)) {
+      if (util.isString(templates)) {
         this.templates = templates
         this.name = name
       } else {
@@ -571,7 +577,7 @@
 
   me.find = name => Component.find(name)
 
-  me.Observer = Observer
+  me.Observer = util.Observer
   me.Collection = Collection
   return me
 })
