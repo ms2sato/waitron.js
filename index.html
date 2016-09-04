@@ -32,11 +32,11 @@
     </template>
     <script>
       w.define(titleBind, function (options) {
-        this.title = options.title || "テスト"
+        this.title = options.title || "Test"
         this.subtitle = options.subtitle || (this.title + new Date)
 
         this.h1Clicked = (e) => {
-          this.title = "ああああ"
+          this.title = "h1Clicked"
         }
 
         this.on('change:title', () => {
@@ -67,8 +67,8 @@
     <script>
       var type = w.define(titleList, function(options){
         this.items = w([
-          {title: 'オプション'},
-          {title: 'タイトル2', subtitle: 'sub'}
+          {title: 'Option'},
+          {title: 'Title2', subtitle: 'sub'}
         ])
       });
       var cmp = type.mixTo(titleListImpl)
